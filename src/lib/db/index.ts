@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { seedIfEmpty } from "./seed";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "platanning.db");
 const SCHEMA_PATH = path.join(process.cwd(), "src", "lib", "db", "schema.sql");
 
