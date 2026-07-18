@@ -32,7 +32,8 @@ and is never sent anywhere unless you explicitly use the AI Coach.
   health/recovery, debt cleanup, joy/identity, convenience, future self).
 - **Monthly Review** — a deterministic, supportively-worded look back at the month.
 - **AI Coach** — optional. Builds a structured summary of your numbers, previews exactly what
-  would be sent, and asks Claude to interpret it — it never recalculates your numbers itself.
+  would be sent, and asks an OpenAI model to interpret it — it never recalculates your numbers
+  itself.
 - **Settings** — every assumption (income, accounts, debts, recurring bills, planning targets) is
   editable; the app ships pre-filled with an example starting position purely so it's useful on
   first load.
@@ -49,12 +50,14 @@ editable example financial position — change anything in **Settings** to match
 
 ### AI Coach (optional)
 
-Set `ANTHROPIC_API_KEY` in your environment to enable the AI Coach. Without it, every other page
+Set `OPENAI_API_KEY` in your environment to enable the AI Coach. Without it, every other page
 works normally; the Coach page will let you preview the data packet but can't send it.
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... npm run dev
+OPENAI_API_KEY=sk-... npm run dev
 ```
+
+The model defaults to `gpt-4o-mini`; override it with `OPENAI_MODEL` if you want a different one.
 
 By default only summary figures are sent, never raw transaction descriptions — see the privacy
 toggle on the Coach page.

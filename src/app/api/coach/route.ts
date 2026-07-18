@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { AiInsights } from "@/lib/db/repo";
 import { buildDataPacket, getAiPrivacyMode, COACH_SYSTEM_PROMPT, type CoachAdvice } from "@/lib/aiCoach";
@@ -51,12 +51,12 @@ const ADVICE_SCHEMA = {
 } as const;
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "No ANTHROPIC_API_KEY configured. Set it in your environment to enable the AI Coach — everything else in this app works without it.",
+          "No OPENAI_API_KEY configured. Set it in your environment to enable the AI Coach — everything else in this app works without it.",
       },
       { status: 501 }
     );
@@ -68,26 +68,34 @@ export async function POST(request: NextRequest) {
 
   const packet = buildDataPacket(question, getAiPrivacyMode());
 
-  const client = new Anthropic({ apiKey });
+  const client = new OpenAI({ apiKey });
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   try {
-    const response = await client.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 2048,
-      system: COACH_SYSTEM_PROMPT,
-      thinking: { type: "disabled" },
-      output_config: { format: { type: "json_schema", schema: ADVICE_SCHEMA } },
-      messages: [{ role: "user", content: JSON.stringify(packet) }],
+    const response = await client.chat.completions.create({
+      model,
+      max_completion_tokens: 2048,
+      messages: [
+        { role: "system", content: COACH_SYSTEM_PROMPT },
+        { role: "user", content: JSON.stringify(packet) },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "coach_advice", strict: true, schema: ADVICE_SCHEMA },
+      },
     });
 
-    if (response.stop_reason === "refusal") {
+    const choice = response.choices[0];
+    if (choice?.finish_reason === "content_filter") {
       return NextResponse.json({ error: "The AI coach declined to respond to this request." }, { status: 422 });
     }
-
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+    const message = choice?.message;
+    if (message?.refusal) {
+      return NextResponse.json({ error: message.refusal }, { status: 422 });
+    }
+    if (!message?.content) {
       return NextResponse.json({ error: "No response text returned." }, { status: 502 });
     }
-    const advice = JSON.parse(textBlock.text) as CoachAdvice;
+    const advice = JSON.parse(message.content) as CoachAdvice;
 
     if (saveInsights) {
       for (const insight of advice.learned_insights_to_save ?? []) {

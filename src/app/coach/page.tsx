@@ -13,7 +13,7 @@ const inputCls =
 export default function CoachPage() {
   const insights = AiInsights.active();
   const privacyMode = getAiPrivacyMode();
-  const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasKey = Boolean(process.env.OPENAI_API_KEY);
 
   return (
     <div className="space-y-6">
@@ -28,7 +28,7 @@ export default function CoachPage() {
       {!hasKey && (
         <Panel className="border-status-yellow-border bg-status-yellow-bg/40">
           <p className="text-sm">
-            No <code>ANTHROPIC_API_KEY</code> is configured yet, so the coach can&apos;t respond.
+            No <code>OPENAI_API_KEY</code> is configured yet, so the coach can&apos;t respond.
             You can still preview exactly what would be sent below. Set the environment variable
             to enable live coaching.
           </p>
