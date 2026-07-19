@@ -120,18 +120,15 @@ export function seedIfEmpty(db: Database.Database) {
     notes: null,
   });
 
-  // Paydays (6 upcoming fortnightly paydays combining main + additional income)
-  const insertPayday = db.prepare("INSERT INTO payday (date, amount, source) VALUES (?, ?, ?)");
-  let payDate = new Date(nextFriday());
-  for (let i = 0; i < 6; i++) {
-    insertPayday.run(
-      payDate.toISOString().slice(0, 10),
-      3541.88 + 1670,
-      "Main + additional income"
-    );
-    payDate = new Date(payDate);
-    payDate.setDate(payDate.getDate() + 14);
-  }
+  // Payday — a single anchor row. The fortnight cycle is projected forward/back from
+  // whichever payday is most recent, so correcting this one date and amount in Settings
+  // is enough to fix every fortnight window; extra rows aren't needed and just risk
+  // going stale (see lib/planning.ts getPaydayAnchor / projectedPaydayForWindow).
+  db.prepare("INSERT INTO payday (date, amount, source) VALUES (?, ?, ?)").run(
+    nextFriday(),
+    3541.88 + 1670,
+    "Main + additional income"
+  );
 
   // Debts (used by Debt Strategy). Card debts reflect total balance owed at
   // the purchase/retail rate given — split into purchase vs instalment once

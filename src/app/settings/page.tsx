@@ -183,7 +183,17 @@ export default function SettingsPage() {
         </details>
       </Panel>
 
-      <Panel title="Paydays" subtitle="Concrete payday dates drive the fortnight planner's windows.">
+      <Panel
+        title="Paydays"
+        subtitle="The fortnight cycle is projected forward and back from whichever payday below is most recent — you don't need one for every future fortnight."
+      >
+        {paydays.length > 1 && (
+          <p className="text-xs text-status-yellow-fg mb-3">
+            You have more than one payday on file. Only the most recent one relative to today is
+            used to work out the fortnight cycle — if your pay date ever changes, remove the old
+            one so it doesn&apos;t get picked up again after this one is in the past.
+          </p>
+        )}
         <ul className="divide-y divide-border mb-3">
           {paydays.map((p) => (
             <li key={p.id} className="flex items-center justify-between py-2 text-sm">

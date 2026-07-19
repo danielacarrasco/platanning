@@ -16,6 +16,7 @@ import type {
   Frequency,
   FortnightStatus,
   IncomeSource,
+  Payday,
   PlanningStyle,
   RecurringExpense,
 } from "./types";
@@ -108,43 +109,77 @@ function isoToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * The single source of truth for "where in the fortnight cycle are we": the most recent
+ * recorded payday on or before referenceDate, or — if every recorded payday is still in the
+ * future — the earliest one known. Both the window boundaries and the projected income for
+ * future fortnights are derived from this same anchor, so correcting one Payday row fixes
+ * everything downstream instead of requiring a literal row per fortnight.
+ */
+function getPaydayAnchor(referenceDate: string): Payday | null {
+  const all = Paydays.all();
+  if (all.length === 0) return null;
+  const past = all.filter((p) => p.date <= referenceDate).sort((a, b) => (a.date < b.date ? 1 : -1));
+  if (past.length > 0) return past[0];
+  return all.slice().sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+}
+
+/** Rolls a date by 14-day steps until it falls within [window.startDate, window.endDate]. */
+function rollToWindow(date: Date, window: FortnightWindow): Date {
+  const cursor = new Date(date);
+  const winStart = new Date(window.startDate);
+  let guard = 0;
+  while (cursor > winStart && guard < 500) {
+    cursor.setDate(cursor.getDate() - 14);
+    guard++;
+  }
+  guard = 0;
+  while (cursor < winStart && guard < 500) {
+    cursor.setDate(cursor.getDate() + 14);
+    guard++;
+  }
+  return cursor;
+}
+
 /** Finds the fortnight window (payday to payday-minus-a-day) containing referenceDate. */
 export function getFortnightWindow(referenceDate: string = isoToday()): FortnightWindow {
-  const paydays = Paydays.all();
-  if (paydays.length === 0) {
+  const anchor = getPaydayAnchor(referenceDate);
+  if (!anchor) {
     const start = new Date(referenceDate);
     const end = new Date(start);
     end.setDate(end.getDate() + 13);
     return { startDate: referenceDate, endDate: end.toISOString().slice(0, 10) };
   }
   const ref = new Date(referenceDate);
-  const past = paydays.filter((p) => new Date(p.date) <= ref).sort((a, b) => (a.date < b.date ? 1 : -1));
-  let start: Date;
-  if (past.length > 0) {
-    start = new Date(past[0].date);
-    // Roll forward in 14-day steps until the window actually contains referenceDate
-    let end = new Date(start);
-    end.setDate(end.getDate() + 13);
-    let guard = 0;
-    while (end < ref && guard < 500) {
-      start.setDate(start.getDate() + 14);
-      end = new Date(start);
-      end.setDate(end.getDate() + 13);
-      guard++;
-    }
-  } else {
-    // Reference date is before all known paydays — count back from the earliest one.
-    const earliest = paydays.slice().sort((a, b) => (a.date < b.date ? -1 : 1))[0];
-    start = new Date(earliest.date);
-    let guard = 0;
-    while (start > ref && guard < 500) {
-      start.setDate(start.getDate() - 14);
-      guard++;
-    }
+  const start = new Date(anchor.date);
+  let guard = 0;
+  while (start > ref && guard < 500) {
+    start.setDate(start.getDate() - 14);
+    guard++;
   }
-  const end = new Date(start);
+  let end = new Date(start);
   end.setDate(end.getDate() + 13);
+  guard = 0;
+  while (end < ref && guard < 500) {
+    start.setDate(start.getDate() + 14);
+    end = new Date(start);
+    end.setDate(end.getDate() + 13);
+    guard++;
+  }
   return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) };
+}
+
+/** Projects the fortnightly pay cycle from the anchor payday into the given window, rather
+ * than requiring a literal Payday row to exist for every future fortnight. */
+function projectedPaydayForWindow(window: FortnightWindow, referenceDate: string): LineItem | null {
+  const anchor = getPaydayAnchor(referenceDate);
+  if (!anchor) return null;
+  const projected = rollToWindow(new Date(anchor.date), window);
+  const iso = projected.toISOString().slice(0, 10);
+  if (iso >= window.startDate && iso <= window.endDate) {
+    return { name: anchor.source, amount: anchor.amount, date: iso };
+  }
+  return null;
 }
 
 export function nextWindow(window: FortnightWindow): FortnightWindow {
@@ -206,15 +241,11 @@ export function buildFortnightSnapshot(
   const accounts = Accounts.all();
   const startingCash = sumEverydayCash(accounts);
 
-  // Income
-  const paydaysInWindow = Paydays.all().filter(
-    (p) => p.date >= window.startDate && p.date <= window.endDate
-  );
-  const incomeItems: LineItem[] = paydaysInWindow.map((p) => ({
-    name: p.source,
-    amount: p.amount,
-    date: p.date,
-  }));
+  // Income — the payday cadence is projected forward/back from the most recent recorded
+  // payday rather than requiring a literal row for every fortnight (see projectedPaydayForWindow).
+  const incomeItems: LineItem[] = [];
+  const projectedPayday = projectedPaydayForWindow(window, isoToday());
+  if (projectedPayday) incomeItems.push(projectedPayday);
   const nonPaydayIncome = IncomeSources.all().filter(
     (i: IncomeSource) => i.name !== "Main income" && i.name !== "Additional income"
   );
