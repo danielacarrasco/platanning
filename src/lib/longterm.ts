@@ -119,9 +119,9 @@ export function buildNetWorthProjection(months = 12): NetWorthPoint[] {
 }
 
 export function getFixedCostPressure(): { pct: number; monthlyIncome: number; monthlyFixed: number } {
-  const paydayMonthly = Paydays.all().length
-    ? conversions.fortnightlyToMonthly(Paydays.all()[0].amount)
-    : 0;
+  const paydays = Paydays.all();
+  const mostRecentPayday = paydays.length ? paydays[paydays.length - 1] : null;
+  const paydayMonthly = mostRecentPayday ? conversions.fortnightlyToMonthly(mostRecentPayday.amount) : 0;
   const otherIncomeMonthly = IncomeSources.all()
     .filter((i) => i.name !== "Main income" && i.name !== "Additional income")
     .reduce((s, i) => s + toMonthly(i.amount, i.frequency), 0);
