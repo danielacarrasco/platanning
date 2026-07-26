@@ -86,7 +86,14 @@ export default async function SpendingPage({
         <Panel title="Add a transaction">
           <form action={createTransaction} className="grid grid-cols-2 gap-3">
             <Field label="Date" name="date" type="date" required />
-            <Field label="Amount (− for spending)" name="amount" required />
+            <div>
+              <label className={labelCls}>Type</label>
+              <select name="type" className={inputCls} defaultValue="spending">
+                <option value="spending">Spending (money out)</option>
+                <option value="income">Income (money in)</option>
+              </select>
+            </div>
+            <Field label="Amount" name="amount" min={0} required />
             <div className="col-span-2">
               <Field label="Description" name="description" type="text" required />
             </div>
@@ -155,7 +162,14 @@ export default async function SpendingPage({
                   <form action={updateTransaction} className="grid grid-cols-2 gap-2 mt-3 text-sm">
                     <input type="hidden" name="id" value={t.id} />
                     <Field label="Date" name="date" type="date" defaultValue={t.date} />
-                    <Field label="Amount" name="amount" defaultValue={t.amount} />
+                    <div>
+                      <label className={labelCls}>Type</label>
+                      <select name="type" defaultValue={t.amount < 0 ? "spending" : "income"} className={inputCls}>
+                        <option value="spending">Spending (money out)</option>
+                        <option value="income">Income (money in)</option>
+                      </select>
+                    </div>
+                    <Field label="Amount" name="amount" defaultValue={Math.abs(t.amount)} min={0} />
                     <div className="col-span-2">
                       <Field label="Description" name="description" type="text" defaultValue={t.description} />
                     </div>
@@ -222,12 +236,14 @@ function Field({
   defaultValue,
   type = "number",
   required = false,
+  min,
 }: {
   label: string;
   name: string;
   defaultValue?: string | number;
   type?: string;
   required?: boolean;
+  min?: number;
 }) {
   return (
     <div>
@@ -238,6 +254,7 @@ function Field({
         type={type}
         defaultValue={defaultValue}
         step={type === "number" ? "0.01" : undefined}
+        min={type === "number" ? min : undefined}
         required={required}
       />
     </div>
