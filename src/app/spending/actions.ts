@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Transactions } from "@/lib/db/transactions";
 import { parseCsv } from "@/lib/csv";
 import { suggestCategory } from "@/lib/categorize";
+import { applyCardTransactionEffect } from "@/lib/cardBalance";
 import type { Category, FundingSource } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
@@ -25,7 +26,7 @@ function strOrNull(fd: FormData, key: string): string | null {
 export async function createTransaction(fd: FormData) {
   const description = str(fd, "description");
   const suggestion = suggestCategory(description);
-  Transactions.create({
+  const transaction = Transactions.create({
     date: str(fd, "date"),
     accountId: numOrNull(fd, "accountId"),
     description,
@@ -44,13 +45,22 @@ export async function createTransaction(fd: FormData) {
     fundingSource: (strOrNull(fd, "fundingSource") as FundingSource) ?? null,
     notes: strOrNull(fd, "notes"),
   });
+  // If this was posted against a credit card, it grows (or shrinks, for a payment) that
+  // card's balance and linked debt immediately — see lib/cardBalance.ts.
+  applyCardTransactionEffect(transaction, 1);
   revalidatePath("/spending");
+  revalidatePath("/cards");
+  revalidatePath("/debt");
+  revalidatePath("/settings");
   revalidatePath("/");
 }
 
 export async function updateTransaction(fd: FormData) {
   const id = num(fd, "id");
-  Transactions.update(id, {
+  const before = Transactions.get(id);
+  if (before) applyCardTransactionEffect(before, -1); // reverse the old effect first
+
+  const updated = Transactions.update(id, {
     date: str(fd, "date"),
     description: str(fd, "description"),
     amount: num(fd, "amount"),
@@ -65,13 +75,24 @@ export async function updateTransaction(fd: FormData) {
     isFamilySupport: fd.get("isFamilySupport") === "on",
     isPlanned: fd.get("isPlanned") === "on",
   });
+  applyCardTransactionEffect(updated, 1); // then apply the corrected one
+
   revalidatePath("/spending");
+  revalidatePath("/cards");
+  revalidatePath("/debt");
+  revalidatePath("/settings");
   revalidatePath("/");
 }
 
 export async function deleteTransaction(fd: FormData) {
-  Transactions.remove(num(fd, "id"));
+  const id = num(fd, "id");
+  const before = Transactions.get(id);
+  if (before) applyCardTransactionEffect(before, -1);
+  Transactions.remove(id);
   revalidatePath("/spending");
+  revalidatePath("/cards");
+  revalidatePath("/debt");
+  revalidatePath("/settings");
   revalidatePath("/");
 }
 

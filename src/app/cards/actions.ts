@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { CardStatements, Accounts } from "@/lib/db/repo";
 import { Transactions } from "@/lib/db/transactions";
 import { calcCardStatus } from "@/lib/calculations";
+import { applyCardTransactionEffect } from "@/lib/cardBalance";
 import type { FundingSource, Category } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
@@ -71,7 +72,7 @@ export async function logCardPurchase(fd: FormData): Promise<CardPurchaseResult>
   const fundingSource = str(fd, "fundingSource") as FundingSource;
   const amount = -Math.abs(num(fd, "amount"));
 
-  Transactions.create({
+  const transaction = Transactions.create({
     date: str(fd, "date"),
     accountId: num(fd, "cardAccountId"),
     description: str(fd, "description"),
@@ -90,9 +91,14 @@ export async function logCardPurchase(fd: FormData): Promise<CardPurchaseResult>
     fundingSource,
     notes: null,
   });
+  // Charging the card grows what's owed on it — at the card's purchase rate — so it's
+  // already lumped into the balance the next payment and debt payoff plan are based on.
+  applyCardTransactionEffect(transaction, 1);
 
   revalidatePath("/cards");
   revalidatePath("/spending");
+  revalidatePath("/debt");
+  revalidatePath("/settings");
   revalidatePath("/");
 
   if (fundingSource === "not_yet_funded") {
