@@ -357,6 +357,15 @@ export default function SettingsPage() {
                 <form action={updateDebt} className="grid sm:grid-cols-3 gap-3">
                   <input type="hidden" name="id" value={d.id} />
                   <Field label="Name" name="name" defaultValue={d.name} type="text" />
+                  <div>
+                    <label className={labelCls}>Account</label>
+                    <select name="accountId" defaultValue={d.accountId ?? ""} className={inputCls}>
+                      <option value="">—</option>
+                      {accounts.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <Field label="Balance" name="balance" defaultValue={d.balance} />
                   <Field label="Interest rate (%)" name="interestRate" defaultValue={d.interestRate} />
                   <Field label="Minimum payment" name="minimumPayment" defaultValue={d.minimumPayment} />
@@ -388,6 +397,15 @@ export default function SettingsPage() {
           <summary className="cursor-pointer text-sm font-medium text-primary">+ Add debt</summary>
           <form action={createDebt} className="grid sm:grid-cols-3 gap-3 mt-3">
             <Field label="Name" name="name" type="text" required />
+            <div>
+              <label className={labelCls}>Account</label>
+              <select name="accountId" className={inputCls} defaultValue="">
+                <option value="">—</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
             <Field label="Balance" name="balance" required />
             <Field label="Interest rate (%)" name="interestRate" required />
             <Field label="Minimum payment" name="minimumPayment" required />

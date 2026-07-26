@@ -159,6 +159,7 @@ export async function updateDebt(fd: FormData) {
   const id = num(fd, "id");
   Debts.update(id, {
     name: str(fd, "name"),
+    accountId: numOrNull(fd, "accountId"),
     balance: num(fd, "balance"),
     interestRate: num(fd, "interestRate"),
     minimumPayment: num(fd, "minimumPayment"),
