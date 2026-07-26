@@ -86,13 +86,6 @@ export default async function SpendingPage({
         <Panel title="Add a transaction">
           <form action={createTransaction} className="grid grid-cols-2 gap-3">
             <Field label="Date" name="date" type="date" required />
-            <div>
-              <label className={labelCls}>Type</label>
-              <select name="type" className={inputCls} defaultValue="spending">
-                <option value="spending">Spending (money out)</option>
-                <option value="income">Income (money in)</option>
-              </select>
-            </div>
             <Field label="Amount" name="amount" min={0} required />
             <div className="col-span-2">
               <Field label="Description" name="description" type="text" required />
@@ -113,6 +106,19 @@ export default async function SpendingPage({
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Destination account (only for Credit card / debt management)</label>
+              <select name="destinationAccountId" className={inputCls} defaultValue="">
+                <option value="">—</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted mt-1">
+                Pick which card, loan, or the mortgage this pays down — e.g. $500 from Everyday
+                account, destination Westpac card.
+              </p>
             </div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isDiscretionary" /> Discretionary</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isFamilySupport" /> Family support</label>
@@ -162,13 +168,6 @@ export default async function SpendingPage({
                   <form action={updateTransaction} className="grid grid-cols-2 gap-2 mt-3 text-sm">
                     <input type="hidden" name="id" value={t.id} />
                     <Field label="Date" name="date" type="date" defaultValue={t.date} />
-                    <div>
-                      <label className={labelCls}>Type</label>
-                      <select name="type" defaultValue={t.amount < 0 ? "spending" : "income"} className={inputCls}>
-                        <option value="spending">Spending (money out)</option>
-                        <option value="income">Income (money in)</option>
-                      </select>
-                    </div>
                     <Field label="Amount" name="amount" defaultValue={Math.abs(t.amount)} min={0} />
                     <div className="col-span-2">
                       <Field label="Description" name="description" type="text" defaultValue={t.description} />
@@ -178,6 +177,15 @@ export default async function SpendingPage({
                       <select name="category" defaultValue={t.category} className={inputCls}>
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Destination account</label>
+                      <select name="destinationAccountId" defaultValue={t.destinationAccountId ?? ""} className={inputCls}>
+                        <option value="">—</option>
+                        {accounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
                       </select>
                     </div>

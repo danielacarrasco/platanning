@@ -51,6 +51,8 @@ export interface Transaction {
   id: number;
   date: string;
   accountId: number | null;
+  /** Only meaningful for "Credit card / debt management": which debt account this pays down. */
+  destinationAccountId: number | null;
   description: string;
   amount: number;
   merchant: string | null;
