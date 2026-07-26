@@ -52,6 +52,7 @@ export async function createTransaction(fd: FormData) {
   revalidatePath("/cards");
   revalidatePath("/debt");
   revalidatePath("/settings");
+  revalidatePath("/planner");
   revalidatePath("/");
 }
 
@@ -81,6 +82,7 @@ export async function updateTransaction(fd: FormData) {
   revalidatePath("/cards");
   revalidatePath("/debt");
   revalidatePath("/settings");
+  revalidatePath("/planner");
   revalidatePath("/");
 }
 
@@ -93,6 +95,7 @@ export async function deleteTransaction(fd: FormData) {
   revalidatePath("/cards");
   revalidatePath("/debt");
   revalidatePath("/settings");
+  revalidatePath("/planner");
   revalidatePath("/");
 }
 
@@ -172,6 +175,7 @@ export async function importTransactionsCsv(fd: FormData): Promise<ImportResult>
   }
 
   revalidatePath("/spending");
+  revalidatePath("/planner");
   revalidatePath("/");
   return { imported, skipped };
 }

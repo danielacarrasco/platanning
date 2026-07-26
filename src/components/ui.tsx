@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { CardStatus, FortnightStatus } from "@/lib/types";
-import { CARD_STATUS_COPY } from "@/lib/calculations";
+import { CARD_STATUS_COPY, type SpendingPace } from "@/lib/calculations";
+import { formatCurrency } from "@/lib/format";
 
 export function Panel({
   children,
@@ -126,6 +127,38 @@ export function ProgressBar({ value, max, tone = "primary" }: { value: number; m
         className={`h-full rounded-full ${tone === "primary" ? "bg-primary" : "bg-accent"}`}
         style={{ width: `${pct}%` }}
       />
+    </div>
+  );
+}
+
+const PACE_COPY: Record<SpendingPace["status"], { label: string; barClass: string; textClass: string }> = {
+  on_track: { label: "On track", barClass: "bg-primary", textClass: "text-muted" },
+  ahead: { label: "Spending faster than the fortnight's pace", barClass: "bg-status-yellow-fg", textClass: "text-status-yellow-fg" },
+  over: { label: "Past the planned amount", barClass: "bg-status-red-fg", textClass: "text-status-red-fg" },
+};
+
+/** Live view of actual spending against a planned bucket for the current fortnight. */
+export function SpendingPaceBar({ label, pace }: { label: string; pace: SpendingPace }) {
+  const copy = PACE_COPY[pace.status];
+  const pct = pace.planned > 0 ? Math.min(100, (pace.actual / pace.planned) * 100) : 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span>{label}</span>
+        <span className="text-muted tabular-nums">
+          {formatCurrency(pace.actual)} of {formatCurrency(pace.planned)}
+        </span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-surface-muted overflow-hidden">
+        <div className={`h-full rounded-full ${copy.barClass}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className={`text-xs mt-1 ${copy.textClass}`}>
+        {pace.status === "over"
+          ? `${copy.label} by ${formatCurrency(Math.abs(pace.remaining))} — worth a look, not a problem.`
+          : pace.remaining >= 0
+            ? `${copy.label}. ${formatCurrency(pace.remaining)} left for the rest of the fortnight.`
+            : copy.label}
+      </p>
     </div>
   );
 }

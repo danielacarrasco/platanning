@@ -137,6 +137,49 @@ export function calcFortnightStatus(params: {
   return "green";
 }
 
+export type SpendingPaceStatus = "on_track" | "ahead" | "over";
+
+export interface SpendingPace {
+  planned: number;
+  actual: number;
+  remaining: number;
+  /** What should have been spent by today if spending were spread evenly across the fortnight. */
+  expectedByNow: number;
+  status: SpendingPaceStatus;
+}
+
+/**
+ * Compares actual spending so far in a fortnight against the planned bucket, pacing it against
+ * how much of the fortnight has elapsed — not just whether the total has been exceeded yet.
+ * Spending noticeably faster than an even pace is flagged "ahead" before it tips into "over",
+ * so the answer to "will this stay in line?" shows up before payday, not after.
+ */
+export function calcSpendingPace(params: {
+  planned: number;
+  actual: number;
+  window: { startDate: string; endDate: string };
+  today: string;
+}): SpendingPace {
+  const start = new Date(params.window.startDate);
+  const end = new Date(params.window.endDate);
+  const now = new Date(params.today);
+  const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  const elapsedDays = Math.min(totalDays, Math.max(1, Math.round((now.getTime() - start.getTime()) / 86400000) + 1));
+  const expectedByNow = round2((params.planned * elapsedDays) / totalDays);
+  const planned = round2(params.planned);
+  const actual = round2(params.actual);
+  const remaining = round2(planned - actual);
+
+  let status: SpendingPaceStatus = "on_track";
+  if (actual > planned) {
+    status = "over";
+  } else if (planned > 0 && actual > expectedByNow * 1.15) {
+    status = "ahead";
+  }
+
+  return { planned, actual, remaining, expectedByNow, status };
+}
+
 export interface BucketSplitResult {
   funMoney: number;
   hobbyMoney: number;

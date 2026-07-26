@@ -1,7 +1,7 @@
 import { Accounts, Debts, SinkingFunds, Settings, AiInsights } from "./db/repo";
 import { Transactions } from "./db/transactions";
 import { buildFortnightSnapshot, getFortnightWindow, getPlanningStyle, getPlanningDefaults } from "./planning";
-import { computeDebtPriority, round2 } from "./calculations";
+import { computeDebtPriority } from "./calculations";
 
 export type AiPrivacyMode = "summary_only" | "raw_opt_in";
 
@@ -68,24 +68,7 @@ export function buildDataPacket(question: string, privacyMode: AiPrivacyMode = "
   const bufferFund = funds.find((f) => f.name === "Emergency buffer");
   const holidayFund = funds.find((f) => f.name === "Holiday fund");
   const patterns = AiInsights.active().map((i) => i.text);
-
   const windowTxns = Transactions.list({ from: window.startDate, to: window.endDate });
-  const cardAccountIds = new Set(Accounts.all().filter((a) => a.type === "credit_card").map((a) => a.id));
-  const actualDiscretionary = round2(
-    windowTxns
-      .filter((t) => t.category === "Discretionary life" && t.isDiscretionary && t.amount < 0)
-      .reduce((s, t) => s + Math.abs(t.amount), 0)
-  );
-  const actualHobbies = round2(
-    windowTxns
-      .filter((t) => t.category === "Hobbies and identity" && t.isDiscretionary && t.amount < 0)
-      .reduce((s, t) => s + Math.abs(t.amount), 0)
-  );
-  const cardSpending = round2(
-    windowTxns
-      .filter((t) => t.accountId && cardAccountIds.has(t.accountId) && t.amount < 0 && !t.isCreditCardPayment && !t.isTransfer)
-      .reduce((s, t) => s + Math.abs(t.amount), 0)
-  );
 
   const packet: CoachDataPacket = {
     user_context: {
@@ -102,10 +85,10 @@ export function buildDataPacket(question: string, privacyMode: AiPrivacyMode = "
       bills_due: snapshot.billsDue,
       required_debt_payments: snapshot.requiredDebtPayments + snapshot.cardPayments,
       planned_discretionary: snapshot.buckets.funMoney,
-      actual_discretionary: actualDiscretionary,
+      actual_discretionary: snapshot.funMoneyPace.actual,
       planned_hobbies: snapshot.buckets.hobbyMoney,
-      actual_hobbies: actualHobbies,
-      card_spending: cardSpending,
+      actual_hobbies: snapshot.hobbyMoneyPace.actual,
+      card_spending: snapshot.actualCardSpending,
       card_payments: snapshot.cardPayments,
       ending_cash_forecast: snapshot.endingCashForecast,
     },
