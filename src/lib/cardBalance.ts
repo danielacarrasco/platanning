@@ -1,9 +1,26 @@
 import { Accounts, Debts } from "./db/repo";
 import { round2 } from "./calculations";
-import type { Transaction } from "./types";
+import type { Account, Transaction } from "./types";
 
 const PURCHASE_RATE = 20.99;
 const DEBT_ACCOUNT_TYPES = new Set(["credit_card", "personal_loan", "mortgage"]);
+/** Typical interest-free window used as a due-date default when a card has no paymentDueDay set. */
+const DEFAULT_DUE_DAYS_AFTER_CHARGE = 21;
+
+/** Next payment due date for a card charge — the account's configured paymentDueDay if it has
+ * one, otherwise a flat window after the charge date. Either way it's a starting guess, editable
+ * in Settings once the real due date is known. */
+function defaultCardDueDate(chargeDate: string, account: Account): string {
+  if (account.paymentDueDay) {
+    const charge = new Date(chargeDate);
+    const due = new Date(charge.getFullYear(), charge.getMonth(), account.paymentDueDay);
+    if (due <= charge) due.setMonth(due.getMonth() + 1);
+    return due.toISOString().slice(0, 10);
+  }
+  const fallback = new Date(chargeDate);
+  fallback.setDate(fallback.getDate() + DEFAULT_DUE_DAYS_AFTER_CHARGE);
+  return fallback.toISOString().slice(0, 10);
+}
 
 /**
  * Keeps a credit card account's balance — and its linked purchase-rate Debt — in sync with
@@ -11,11 +28,15 @@ const DEBT_ACCOUNT_TYPES = new Set(["credit_card", "personal_loan", "mortgage"])
  * balance by -amount, so a purchase (negative amount) grows what's owed, immediately lumped into
  * the balance the next payment and debt payoff calculations are based on.
  *
+ * Also makes sure the linked debt has a next payment date — without one it's invisible to the
+ * Fortnight Planner's "bills due" and required-debt-payment totals, so a card charge would grow
+ * the balance everywhere it's displayed but never actually get planned for.
+ *
  * Pass sign=1 to apply a transaction's effect, sign=-1 to reverse it (on edit/delete).
  * No-ops for any account that isn't a credit card.
  */
 export function applyCardTransactionEffect(
-  transaction: Pick<Transaction, "accountId" | "amount">,
+  transaction: Pick<Transaction, "accountId" | "amount" | "date">,
   sign: 1 | -1
 ): void {
   if (!transaction.accountId) return;
@@ -32,7 +53,11 @@ export function applyCardTransactionEffect(
     (d) => d.accountId === account.id && d.debtType === "credit_card_purchase"
   );
   if (linkedDebt) {
-    Debts.update(linkedDebt.id, { balance: Math.max(0, round2(linkedDebt.balance + delta)) });
+    Debts.update(linkedDebt.id, {
+      balance: Math.max(0, round2(linkedDebt.balance + delta)),
+      nextPaymentDate:
+        linkedDebt.nextPaymentDate ?? (delta > 0 ? defaultCardDueDate(transaction.date, account) : null),
+    });
   } else if (delta > 0) {
     // A purchase grew the card with no existing debt record for it yet — start one.
     Debts.create({
@@ -43,11 +68,11 @@ export function applyCardTransactionEffect(
       minimumPayment: round2(Math.max(delta * 0.025, 20)),
       paymentFrequency: "monthly",
       debtType: "credit_card_purchase",
-      nextPaymentDate: null,
+      nextPaymentDate: defaultCardDueDate(transaction.date, account),
       priority: null,
       isPromotional: false,
       promotionalEndDate: null,
-      notes: "Auto-created from card purchases — adjust the minimum payment once you know the real one.",
+      notes: "Auto-created from card purchases — adjust the minimum payment and due date once you know the real ones.",
     });
   }
 }
