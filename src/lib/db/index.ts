@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { seedIfEmpty } from "./seed";
+import { runMigrations } from "./migrations";
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "platanning.db");
@@ -20,6 +21,7 @@ function createConnection(): Database.Database {
   db.pragma("foreign_keys = ON");
   const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
   db.exec(schema);
+  runMigrations(db);
   seedIfEmpty(db);
   return db;
 }

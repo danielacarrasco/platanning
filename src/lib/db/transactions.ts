@@ -59,10 +59,10 @@ export const Transactions = {
     const info = getDb()
       .prepare(
         `INSERT INTO "transaction"
-          (date, account_id, description, amount, merchant, category, subcategory, is_transfer,
+          (date, account_id, destination_account_id, description, amount, merchant, category, subcategory, is_transfer,
            is_credit_card_payment, is_debt_payment, is_interest, is_fee, is_discretionary,
            is_family_support, is_planned, funding_source, notes)
-         VALUES (@date, @accountId, @description, @amount, @merchant, @category, @subcategory, @isTransfer,
+         VALUES (@date, @accountId, @destinationAccountId, @description, @amount, @merchant, @category, @subcategory, @isTransfer,
            @isCreditCardPayment, @isDebtPayment, @isInterest, @isFee, @isDiscretionary,
            @isFamilySupport, @isPlanned, @fundingSource, @notes)`
       )
@@ -72,10 +72,10 @@ export const Transactions = {
   createMany(rows: Omit<Transaction, "id" | "createdAt">[]): number {
     const insert = getDb().prepare(
       `INSERT INTO "transaction"
-        (date, account_id, description, amount, merchant, category, subcategory, is_transfer,
+        (date, account_id, destination_account_id, description, amount, merchant, category, subcategory, is_transfer,
          is_credit_card_payment, is_debt_payment, is_interest, is_fee, is_discretionary,
          is_family_support, is_planned, funding_source, notes)
-       VALUES (@date, @accountId, @description, @amount, @merchant, @category, @subcategory, @isTransfer,
+       VALUES (@date, @accountId, @destinationAccountId, @description, @amount, @merchant, @category, @subcategory, @isTransfer,
          @isCreditCardPayment, @isDebtPayment, @isInterest, @isFee, @isDiscretionary,
          @isFamilySupport, @isPlanned, @fundingSource, @notes)`
     );
@@ -91,10 +91,10 @@ export const Transactions = {
     const merged = { ...existing, ...data };
     getDb()
       .prepare(
-        `UPDATE "transaction" SET date=@date, account_id=@accountId, description=@description, amount=@amount,
-         merchant=@merchant, category=@category, subcategory=@subcategory, is_transfer=@isTransfer,
-         is_credit_card_payment=@isCreditCardPayment, is_debt_payment=@isDebtPayment, is_interest=@isInterest,
-         is_fee=@isFee, is_discretionary=@isDiscretionary, is_family_support=@isFamilySupport,
+        `UPDATE "transaction" SET date=@date, account_id=@accountId, destination_account_id=@destinationAccountId,
+         description=@description, amount=@amount, merchant=@merchant, category=@category, subcategory=@subcategory,
+         is_transfer=@isTransfer, is_credit_card_payment=@isCreditCardPayment, is_debt_payment=@isDebtPayment,
+         is_interest=@isInterest, is_fee=@isFee, is_discretionary=@isDiscretionary, is_family_support=@isFamilySupport,
          is_planned=@isPlanned, funding_source=@fundingSource, notes=@notes WHERE id=@id`
       )
       .run({ ...merged, id, ...boolFields(merged) });

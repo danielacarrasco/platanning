@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS "transaction" (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL,
   account_id INTEGER REFERENCES account(id),
+  destination_account_id INTEGER REFERENCES account(id), -- for Credit card / debt management: which debt this pays down
   description TEXT NOT NULL,
   amount REAL NOT NULL, -- negative = money out, positive = money in
   merchant TEXT,

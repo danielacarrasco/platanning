@@ -75,6 +75,7 @@ export async function logCardPurchase(fd: FormData): Promise<CardPurchaseResult>
   const transaction = Transactions.create({
     date: str(fd, "date"),
     accountId: num(fd, "cardAccountId"),
+    destinationAccountId: null,
     description: str(fd, "description"),
     amount,
     merchant: null,

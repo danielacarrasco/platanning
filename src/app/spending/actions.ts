@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Transactions } from "@/lib/db/transactions";
 import { parseCsv } from "@/lib/csv";
 import { suggestCategory } from "@/lib/categorize";
-import { applyCardTransactionEffect } from "@/lib/cardBalance";
+import { applyCardTransactionEffect, applyDebtPaymentEffect } from "@/lib/cardBalance";
 import type { Category, FundingSource } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
@@ -23,22 +23,17 @@ function strOrNull(fd: FormData, key: string): string | null {
   return v === "" ? null : v;
 }
 
-/** The sign always comes from the explicit "type" field, not from whatever the user typed in
- * the amount box — a stray or missing minus sign used to silently exclude real spending from
- * every "actual spend" total in the app (it still showed in the list, just uncounted). */
-function signedAmount(fd: FormData): number {
-  const magnitude = Math.abs(num(fd, "amount"));
-  return str(fd, "type") === "income" ? magnitude : -magnitude;
-}
-
 export async function createTransaction(fd: FormData) {
   const description = str(fd, "description");
   const suggestion = suggestCategory(description);
+  // Every manually-entered transaction is assumed to be spending — money out.
+  const amount = -Math.abs(num(fd, "amount"));
   const transaction = Transactions.create({
     date: str(fd, "date"),
     accountId: numOrNull(fd, "accountId"),
+    destinationAccountId: numOrNull(fd, "destinationAccountId"),
     description,
-    amount: signedAmount(fd),
+    amount,
     merchant: strOrNull(fd, "merchant"),
     category: (str(fd, "category") || suggestion.category) as Category,
     subcategory: strOrNull(fd, "subcategory"),
@@ -53,9 +48,10 @@ export async function createTransaction(fd: FormData) {
     fundingSource: (strOrNull(fd, "fundingSource") as FundingSource) ?? null,
     notes: strOrNull(fd, "notes"),
   });
-  // If this was posted against a credit card, it grows (or shrinks, for a payment) that
-  // card's balance and linked debt immediately — see lib/cardBalance.ts.
+  // A purchase charged straight to a card grows that card's balance; a "Credit card / debt
+  // management" transaction with a destination account pays that debt down — see lib/cardBalance.ts.
   applyCardTransactionEffect(transaction, 1);
+  applyDebtPaymentEffect(transaction, 1);
   revalidatePath("/spending");
   revalidatePath("/cards");
   revalidatePath("/debt");
@@ -67,12 +63,17 @@ export async function createTransaction(fd: FormData) {
 export async function updateTransaction(fd: FormData) {
   const id = num(fd, "id");
   const before = Transactions.get(id);
-  if (before) applyCardTransactionEffect(before, -1); // reverse the old effect first
+  if (before) {
+    applyCardTransactionEffect(before, -1); // reverse the old effect first
+    applyDebtPaymentEffect(before, -1);
+  }
 
+  const amount = -Math.abs(num(fd, "amount"));
   const updated = Transactions.update(id, {
     date: str(fd, "date"),
+    destinationAccountId: numOrNull(fd, "destinationAccountId"),
     description: str(fd, "description"),
-    amount: signedAmount(fd),
+    amount,
     category: str(fd, "category") as Category,
     subcategory: strOrNull(fd, "subcategory"),
     isTransfer: fd.get("isTransfer") === "on",
@@ -85,6 +86,7 @@ export async function updateTransaction(fd: FormData) {
     isPlanned: fd.get("isPlanned") === "on",
   });
   applyCardTransactionEffect(updated, 1); // then apply the corrected one
+  applyDebtPaymentEffect(updated, 1);
 
   revalidatePath("/spending");
   revalidatePath("/cards");
@@ -97,7 +99,10 @@ export async function updateTransaction(fd: FormData) {
 export async function deleteTransaction(fd: FormData) {
   const id = num(fd, "id");
   const before = Transactions.get(id);
-  if (before) applyCardTransactionEffect(before, -1);
+  if (before) {
+    applyCardTransactionEffect(before, -1);
+    applyDebtPaymentEffect(before, -1);
+  }
   Transactions.remove(id);
   revalidatePath("/spending");
   revalidatePath("/cards");
@@ -159,6 +164,7 @@ export async function importTransactionsCsv(fd: FormData): Promise<ImportResult>
     toInsert.push({
       date,
       accountId: null,
+      destinationAccountId: null,
       description,
       amount,
       merchant: merchantKey ? row[merchantKey] || null : null,
