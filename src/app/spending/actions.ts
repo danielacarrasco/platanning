@@ -23,6 +23,14 @@ function strOrNull(fd: FormData, key: string): string | null {
   return v === "" ? null : v;
 }
 
+/** The sign always comes from the explicit "type" field, not from whatever the user typed in
+ * the amount box — a stray or missing minus sign used to silently exclude real spending from
+ * every "actual spend" total in the app (it still showed in the list, just uncounted). */
+function signedAmount(fd: FormData): number {
+  const magnitude = Math.abs(num(fd, "amount"));
+  return str(fd, "type") === "income" ? magnitude : -magnitude;
+}
+
 export async function createTransaction(fd: FormData) {
   const description = str(fd, "description");
   const suggestion = suggestCategory(description);
@@ -30,7 +38,7 @@ export async function createTransaction(fd: FormData) {
     date: str(fd, "date"),
     accountId: numOrNull(fd, "accountId"),
     description,
-    amount: num(fd, "amount"),
+    amount: signedAmount(fd),
     merchant: strOrNull(fd, "merchant"),
     category: (str(fd, "category") || suggestion.category) as Category,
     subcategory: strOrNull(fd, "subcategory"),
@@ -64,7 +72,7 @@ export async function updateTransaction(fd: FormData) {
   const updated = Transactions.update(id, {
     date: str(fd, "date"),
     description: str(fd, "description"),
-    amount: num(fd, "amount"),
+    amount: signedAmount(fd),
     category: str(fd, "category") as Category,
     subcategory: strOrNull(fd, "subcategory"),
     isTransfer: fd.get("isTransfer") === "on",
