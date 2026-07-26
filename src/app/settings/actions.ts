@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Accounts, IncomeSources, RecurringExpenses, Debts, Paydays, Settings } from "@/lib/db/repo";
 import { DEFAULT_PLANNING_DEFAULTS, type PlanningDefaults } from "@/lib/calculations";
+import { syncAccountBalanceFromDebt } from "@/lib/cardBalance";
 import type { AccountType, DebtType, Frequency, Importance, AmountType, PlanningStyle } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
@@ -137,7 +138,7 @@ export async function deleteRecurringExpense(fd: FormData) {
 
 /* Debts */
 export async function createDebt(fd: FormData) {
-  Debts.create({
+  const debt = Debts.create({
     name: str(fd, "name"),
     accountId: numOrNull(fd, "accountId"),
     balance: num(fd, "balance"),
@@ -151,13 +152,16 @@ export async function createDebt(fd: FormData) {
     promotionalEndDate: strOrNull(fd, "promotionalEndDate"),
     notes: strOrNull(fd, "notes"),
   });
+  // Linking a debt to a credit_card/personal_loan/mortgage account mirrors the balance onto
+  // that account immediately, so the two never drift apart — see lib/cardBalance.ts.
+  syncAccountBalanceFromDebt(debt);
   revalidatePath("/settings");
   revalidatePath("/debt");
   revalidatePath("/");
 }
 export async function updateDebt(fd: FormData) {
   const id = num(fd, "id");
-  Debts.update(id, {
+  const debt = Debts.update(id, {
     name: str(fd, "name"),
     accountId: numOrNull(fd, "accountId"),
     balance: num(fd, "balance"),
@@ -168,6 +172,7 @@ export async function updateDebt(fd: FormData) {
     isPromotional: fd.get("isPromotional") === "on",
     promotionalEndDate: strOrNull(fd, "promotionalEndDate"),
   });
+  syncAccountBalanceFromDebt(debt);
   revalidatePath("/settings");
   revalidatePath("/debt");
   revalidatePath("/");
