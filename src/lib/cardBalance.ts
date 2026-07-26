@@ -84,6 +84,38 @@ export function applyDebtPaymentEffect(
 }
 
 /**
+ * Keeps a transaction's source account (accountId) — cash accounts especially — in sync with
+ * money actually leaving or arriving there, so "Cash available today" on the Dashboard reflects
+ * real spending instead of a balance that only ever gets updated by hand.
+ *
+ * everyday/savings/offset accounts hold real cash: the balance simply moves by the transaction
+ * amount (spending, which is negative, reduces it). credit_card is skipped here — it's already
+ * handled by applyCardTransactionEffect, which treats a card charge as debt growing rather than
+ * cash leaving. personal_loan/mortgage used as a funding source grow what's owed, same direction
+ * as a card purchase, since drawing on a loan to pay for something isn't spending real cash.
+ *
+ * Pass sign=1 to apply a transaction's effect, sign=-1 to reverse it (on edit/delete).
+ */
+export function applySourceAccountEffect(
+  transaction: Pick<Transaction, "accountId" | "amount">,
+  sign: 1 | -1
+): void {
+  if (!transaction.accountId) return;
+  const account = Accounts.get(transaction.accountId);
+  if (!account || account.type === "credit_card") return;
+
+  const delta = transaction.amount * sign;
+  if (delta === 0) return;
+
+  if (account.type === "personal_loan" || account.type === "mortgage") {
+    const newBalance = Math.max(0, round2(account.currentBalance - delta));
+    Accounts.update(account.id, { currentBalance: newBalance });
+  } else {
+    Accounts.update(account.id, { currentBalance: round2(account.currentBalance + delta) });
+  }
+}
+
+/**
  * Keeps a debt-type account's currentBalance mirroring the SUM of every Debt linked to it — e.g.
  * a card with both a purchases debt and an instalment plan debt shows their combined balance, not
  * just whichever one was last edited. Recomputes from scratch each call rather than adding a delta,

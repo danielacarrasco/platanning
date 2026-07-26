@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { Transactions } from "@/lib/db/transactions";
+import { Accounts } from "@/lib/db/repo";
 import { parseCsv } from "@/lib/csv";
 import { suggestCategory } from "@/lib/categorize";
-import { applyCardTransactionEffect, applyDebtPaymentEffect } from "@/lib/cardBalance";
+import { applyCardTransactionEffect, applyDebtPaymentEffect, applySourceAccountEffect } from "@/lib/cardBalance";
 import type { Category, FundingSource } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
@@ -28,30 +29,40 @@ export async function createTransaction(fd: FormData) {
   const suggestion = suggestCategory(description);
   // Every manually-entered transaction is assumed to be spending — money out.
   const amount = -Math.abs(num(fd, "amount"));
+  const category = (str(fd, "category") || suggestion.category) as Category;
+  const destinationAccountId = numOrNull(fd, "destinationAccountId");
+  const destinationAccount = destinationAccountId ? Accounts.get(destinationAccountId) : undefined;
+  const isDebtManagement = category === "Credit card / debt management";
+
   const transaction = Transactions.create({
     date: str(fd, "date"),
     accountId: numOrNull(fd, "accountId"),
-    destinationAccountId: numOrNull(fd, "destinationAccountId"),
+    destinationAccountId,
     description,
     amount,
     merchant: strOrNull(fd, "merchant"),
-    category: (str(fd, "category") || suggestion.category) as Category,
+    category,
     subcategory: strOrNull(fd, "subcategory"),
-    isTransfer: fd.get("isTransfer") === "on",
-    isCreditCardPayment: fd.get("isCreditCardPayment") === "on",
-    isDebtPayment: fd.get("isDebtPayment") === "on",
-    isInterest: fd.get("isInterest") === "on",
-    isFee: fd.get("isFee") === "on",
-    isDiscretionary: fd.get("isDiscretionary") === "on",
-    isFamilySupport: fd.get("isFamilySupport") === "on",
-    isPlanned: fd.get("isPlanned") === "on",
+    // No more manual checkboxes — the category and destination account (an authoritative user
+    // choice) plus the same description heuristics CSV import uses are enough to classify these.
+    isTransfer: suggestion.isTransfer,
+    isCreditCardPayment: isDebtManagement && destinationAccount?.type === "credit_card",
+    isDebtPayment: isDebtManagement && (destinationAccount?.type === "personal_loan" || destinationAccount?.type === "mortgage"),
+    isInterest: suggestion.isInterest,
+    isFee: suggestion.isFee,
+    isDiscretionary:
+      category === "Discretionary life" || category === "Hobbies and identity" || category === "Personal" || suggestion.isDiscretionary,
+    isFamilySupport: category === "Family support" || suggestion.isFamilySupport,
+    isPlanned: false,
     fundingSource: (strOrNull(fd, "fundingSource") as FundingSource) ?? null,
     notes: strOrNull(fd, "notes"),
   });
   // A purchase charged straight to a card grows that card's balance; a "Credit card / debt
-  // management" transaction with a destination account pays that debt down — see lib/cardBalance.ts.
+  // management" transaction with a destination account pays that debt down; the source account
+  // (cash leaving an everyday account, or a loan drawn on) moves too — see lib/cardBalance.ts.
   applyCardTransactionEffect(transaction, 1);
   applyDebtPaymentEffect(transaction, 1);
+  applySourceAccountEffect(transaction, 1);
   revalidatePath("/spending");
   revalidatePath("/cards");
   revalidatePath("/debt");
@@ -66,6 +77,7 @@ export async function updateTransaction(fd: FormData) {
   if (before) {
     applyCardTransactionEffect(before, -1); // reverse the old effect first
     applyDebtPaymentEffect(before, -1);
+    applySourceAccountEffect(before, -1);
   }
 
   const amount = -Math.abs(num(fd, "amount"));
@@ -87,6 +99,7 @@ export async function updateTransaction(fd: FormData) {
   });
   applyCardTransactionEffect(updated, 1); // then apply the corrected one
   applyDebtPaymentEffect(updated, 1);
+  applySourceAccountEffect(updated, 1);
 
   revalidatePath("/spending");
   revalidatePath("/cards");
@@ -102,6 +115,7 @@ export async function deleteTransaction(fd: FormData) {
   if (before) {
     applyCardTransactionEffect(before, -1);
     applyDebtPaymentEffect(before, -1);
+    applySourceAccountEffect(before, -1);
   }
   Transactions.remove(id);
   revalidatePath("/spending");

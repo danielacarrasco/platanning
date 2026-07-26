@@ -120,14 +120,6 @@ export default async function SpendingPage({
                 account, destination Westpac card.
               </p>
             </div>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isDiscretionary" /> Discretionary</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isFamilySupport" /> Family support</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isTransfer" /> Transfer between own accounts</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isCreditCardPayment" /> Credit card payment</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isDebtPayment" /> Debt principal payment</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isInterest" /> Interest charged</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isFee" /> Fee</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isPlanned" /> Planned purchase</label>
             <div className="col-span-2">
               <button className={btnCls} type="submit">Add transaction</button>
             </div>
