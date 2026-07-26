@@ -1,6 +1,6 @@
 import { Accounts, Debts } from "./db/repo";
 import { round2 } from "./calculations";
-import type { Debt, Transaction } from "./types";
+import type { Transaction } from "./types";
 
 const PURCHASE_RATE = 20.99;
 const DEBT_ACCOUNT_TYPES = new Set(["credit_card", "personal_loan", "mortgage"]);
@@ -84,17 +84,22 @@ export function applyDebtPaymentEffect(
 }
 
 /**
- * Keeps a debt-type account's currentBalance mirroring its linked Debt's balance — e.g. editing
- * a debt's balance in Settings immediately updates the credit_card/personal_loan/mortgage account
- * it's linked to, so the two never drift apart. No-ops if the debt has no account, or the account
- * isn't a debt-type account.
+ * Keeps a debt-type account's currentBalance mirroring the SUM of every Debt linked to it — e.g.
+ * a card with both a purchases debt and an instalment plan debt shows their combined balance, not
+ * just whichever one was last edited. Recomputes from scratch each call rather than adding a delta,
+ * so it's safe to call after any create/update/delete of a linked debt.
+ * No-ops if the account isn't a debt-type account (credit_card/personal_loan/mortgage).
  */
-export function syncAccountBalanceFromDebt(debt: Pick<Debt, "accountId" | "balance">): void {
-  if (!debt.accountId) return;
-  const account = Accounts.get(debt.accountId);
+export function syncAccountBalanceFromDebts(accountId: number | null): void {
+  if (!accountId) return;
+  const account = Accounts.get(accountId);
   if (!account || !DEBT_ACCOUNT_TYPES.has(account.type)) return;
 
-  const newBalance = round2(Math.max(0, debt.balance));
+  const total = Debts.all()
+    .filter((d) => d.accountId === accountId)
+    .reduce((sum, d) => sum + d.balance, 0);
+
+  const newBalance = round2(Math.max(0, total));
   if (newBalance === account.currentBalance) return;
   Accounts.update(account.id, { currentBalance: newBalance });
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Accounts, IncomeSources, RecurringExpenses, Debts, Paydays, Settings } from "@/lib/db/repo";
 import { DEFAULT_PLANNING_DEFAULTS, type PlanningDefaults } from "@/lib/calculations";
-import { syncAccountBalanceFromDebt } from "@/lib/cardBalance";
+import { syncAccountBalanceFromDebts } from "@/lib/cardBalance";
 import type { AccountType, DebtType, Frequency, Importance, AmountType, PlanningStyle } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
@@ -152,15 +152,16 @@ export async function createDebt(fd: FormData) {
     promotionalEndDate: strOrNull(fd, "promotionalEndDate"),
     notes: strOrNull(fd, "notes"),
   });
-  // Linking a debt to a credit_card/personal_loan/mortgage account mirrors the balance onto
-  // that account immediately, so the two never drift apart — see lib/cardBalance.ts.
-  syncAccountBalanceFromDebt(debt);
+  // Linking a debt to a credit_card/personal_loan/mortgage account mirrors the SUM of every
+  // debt linked to that account onto its balance — see lib/cardBalance.ts.
+  syncAccountBalanceFromDebts(debt.accountId);
   revalidatePath("/settings");
   revalidatePath("/debt");
   revalidatePath("/");
 }
 export async function updateDebt(fd: FormData) {
   const id = num(fd, "id");
+  const before = Debts.get(id);
   const debt = Debts.update(id, {
     name: str(fd, "name"),
     accountId: numOrNull(fd, "accountId"),
@@ -172,13 +173,19 @@ export async function updateDebt(fd: FormData) {
     isPromotional: fd.get("isPromotional") === "on",
     promotionalEndDate: strOrNull(fd, "promotionalEndDate"),
   });
-  syncAccountBalanceFromDebt(debt);
+  syncAccountBalanceFromDebts(debt.accountId);
+  if (before && before.accountId !== debt.accountId) {
+    syncAccountBalanceFromDebts(before.accountId); // moved off this account — recompute its old total too
+  }
   revalidatePath("/settings");
   revalidatePath("/debt");
   revalidatePath("/");
 }
 export async function deleteDebt(fd: FormData) {
-  Debts.remove(num(fd, "id"));
+  const id = num(fd, "id");
+  const debt = Debts.get(id);
+  Debts.remove(id);
+  syncAccountBalanceFromDebts(debt?.accountId ?? null);
   revalidatePath("/settings");
   revalidatePath("/debt");
   revalidatePath("/");
