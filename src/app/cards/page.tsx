@@ -35,7 +35,15 @@ export default function CardsPage() {
         {cardAccounts.length === 0 ? (
           <EmptyState>Add a credit card account in Settings first.</EmptyState>
         ) : (
-          <CashBeforeCard cardAccounts={cardAccounts} />
+          <>
+            <CashBeforeCard cardAccounts={cardAccounts} />
+            <p className="text-xs text-muted mt-3">
+              Charging a purchase here grows that card&apos;s tracked balance immediately, at its
+              20.99% purchase rate — it&apos;s already lumped into the next payment and the debt
+              payoff plan below, no separate statement update needed. A transaction posted
+              against a card with a positive amount (a payment) reduces it the same way.
+            </p>
+          </>
         )}
       </Panel>
 
