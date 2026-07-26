@@ -3,7 +3,7 @@ import { Accounts, Debts, SinkingFunds } from "@/lib/db/repo";
 import { buildFortnightSnapshot, getFortnightWindow, getPlanningStyle, getPlanningDefaults, assessCardRisk } from "@/lib/planning";
 import { computeDebtPriority } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
-import { FortnightStatusBadge, Panel, ProgressBar, StatCard, CardStatusBadge, EmptyState } from "@/components/ui";
+import { FortnightStatusBadge, Panel, ProgressBar, StatCard, CardStatusBadge, EmptyState, SpendingPaceBar } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -60,9 +60,9 @@ export default function DashboardPage() {
           hint="Everyday accounts only"
         />
         <StatCard
-          label="Safe to spend this fortnight"
-          value={formatCurrency(snapshot.buckets.funMoney)}
-          hint="Discretionary life — after bills, debt & set-asides"
+          label="Safe to spend, left this fortnight"
+          value={formatCurrency(Math.max(0, snapshot.funMoneyPace.remaining))}
+          hint={`${formatCurrency(snapshot.funMoneyPace.actual)} spent of ${formatCurrency(snapshot.funMoneyPace.planned)} planned`}
           tone="primary"
         />
         <StatCard
@@ -128,6 +128,25 @@ export default function DashboardPage() {
             <p className="font-semibold">{formatCurrency(trueDiscretionary)}</p>
           </div>
         </div>
+      </Panel>
+
+      <Panel
+        title="Spending so far this fortnight"
+        subtitle="Updates as soon as you log a transaction — this is where the fortnight actually stands, not just the plan."
+        action={<Link href="/spending" className="text-sm text-primary font-medium">Log a transaction →</Link>}
+      >
+        <div className="grid sm:grid-cols-2 gap-6">
+          <SpendingPaceBar label="Fun money (coffees, eating out, treats)" pace={snapshot.funMoneyPace} />
+          <SpendingPaceBar label="Sewing / hobbies" pace={snapshot.hobbyMoneyPace} />
+        </div>
+        {snapshot.actualCardSpending > 0 && (
+          <p className="text-xs text-muted mt-4">
+            {formatCurrency(snapshot.actualCardSpending)} of this fortnight&apos;s spending has gone
+            on a credit card so far —{" "}
+            <Link href="/cards" className="underline">check Credit Card Control</Link> if any of it
+            still needs cash behind it.
+          </p>
+        )}
       </Panel>
 
       <div className="grid md:grid-cols-2 gap-4">

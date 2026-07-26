@@ -99,6 +99,7 @@ export async function logCardPurchase(fd: FormData): Promise<CardPurchaseResult>
   revalidatePath("/spending");
   revalidatePath("/debt");
   revalidatePath("/settings");
+  revalidatePath("/planner");
   revalidatePath("/");
 
   if (fundingSource === "not_yet_funded") {

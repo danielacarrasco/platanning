@@ -6,7 +6,7 @@ import {
   listWindows,
 } from "@/lib/planning";
 import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
-import { FortnightStatusBadge, Panel, EmptyState } from "@/components/ui";
+import { FortnightStatusBadge, Panel, EmptyState, SpendingPaceBar } from "@/components/ui";
 import type { PlanningStyle } from "@/lib/types";
 import { updatePlanningStyle } from "../settings/actions";
 
@@ -101,10 +101,14 @@ export default async function PlannerPage({
           </div>
 
           <div className="mt-5">
-            <p className="text-sm font-medium mb-2">Suggested buckets</p>
-            <div className="space-y-1 text-sm">
-              <Row label="Fun money (coffees, eating out, movies)" amount={snapshot.buckets.funMoney} indent />
-              <Row label="Sewing / hobbies" amount={snapshot.buckets.hobbyMoney} indent />
+            <p className="text-sm font-medium mb-2">
+              {offset === 0 ? "Suggested buckets — live against actual spending" : "Suggested buckets"}
+            </p>
+            <div className="space-y-4">
+              <SpendingPaceBar label="Fun money (coffees, eating out, movies)" pace={snapshot.funMoneyPace} />
+              <SpendingPaceBar label="Sewing / hobbies" pace={snapshot.hobbyMoneyPace} />
+            </div>
+            <div className="space-y-1 text-sm mt-4">
               <Row label="Holiday fund" amount={snapshot.buckets.holidayContribution} indent />
               <Row label="Emergency buffer" amount={snapshot.buckets.bufferContribution} indent />
               <Row label="Card cleanup / extra debt payment" amount={snapshot.buckets.cardCleanup} indent />

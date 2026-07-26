@@ -1,13 +1,16 @@
 import { Accounts, Debts, IncomeSources, Paydays, RecurringExpenses, SinkingFunds, CardStatements, Settings } from "./db/repo";
+import { Transactions } from "./db/transactions";
 import {
   DEFAULT_PLANNING_DEFAULTS,
   calcCardStatus,
   calcFortnightStatus,
+  calcSpendingPace,
   calcTrueAvailable,
   splitFlexibleCash,
   round2,
   type BucketSplitResult,
   type PlanningDefaults,
+  type SpendingPace,
 } from "./calculations";
 import type {
   Account,
@@ -54,6 +57,11 @@ export interface FortnightSnapshot {
   status: FortnightStatus;
   worstCardStatus: CardStatus;
   endingCashForecast: number;
+  /** Actual spending logged so far in this window vs the planned bucket, paced against
+   * how much of the fortnight has elapsed — updates live as transactions are added. */
+  funMoneyPace: SpendingPace;
+  hobbyMoneyPace: SpendingPace;
+  actualCardSpending: number;
 }
 
 /** Roll a date forward by one period of the given frequency (calendar-correct). */
@@ -334,6 +342,24 @@ export function buildFortnightSnapshot(
       buckets.funMoney - buckets.hobbyMoney - buckets.holidayContribution - buckets.bufferContribution - buckets.cardCleanup
   );
 
+  // Live spending: what's actually been logged in this window so far, paced against the plan.
+  const today = isoToday();
+  const windowTxns = Transactions.list({ from: window.startDate, to: window.endDate });
+  const actualFunMoney = windowTxns
+    .filter((t) => t.category === "Discretionary life" && t.isDiscretionary && t.amount < 0)
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const actualHobbyMoney = windowTxns
+    .filter((t) => t.category === "Hobbies and identity" && t.isDiscretionary && t.amount < 0)
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const cardAccountIds = new Set(accounts.filter((a) => a.type === "credit_card").map((a) => a.id));
+  const actualCardSpending = round2(
+    windowTxns
+      .filter((t) => t.accountId && cardAccountIds.has(t.accountId) && t.amount < 0 && !t.isCreditCardPayment && !t.isTransfer)
+      .reduce((s, t) => s + Math.abs(t.amount), 0)
+  );
+  const funMoneyPace = calcSpendingPace({ planned: buckets.funMoney, actual: actualFunMoney, window, today });
+  const hobbyMoneyPace = calcSpendingPace({ planned: buckets.hobbyMoney, actual: actualHobbyMoney, window, today });
+
   return {
     window,
     planningStyle,
@@ -354,6 +380,9 @@ export function buildFortnightSnapshot(
     status,
     worstCardStatus: cardRisk.worst,
     endingCashForecast,
+    funMoneyPace,
+    hobbyMoneyPace,
+    actualCardSpending,
   };
 }
 
