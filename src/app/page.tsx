@@ -21,7 +21,9 @@ export default function DashboardPage() {
   const bufferFund = funds.find((f) => f.name === "Emergency buffer");
 
   const trueDiscretionary = snapshot.buckets.funMoney + snapshot.buckets.hobbyMoney;
-  const cardAccounts = Accounts.all().filter((a) => a.type === "credit_card");
+  const allAccounts = Accounts.all();
+  const everydayAccounts = allAccounts.filter((a) => a.type === "everyday");
+  const cardAccounts = allAccounts.filter((a) => a.type === "credit_card");
   const totalCardDebt = cardAccounts.reduce((s, a) => s + a.currentBalance, 0);
   const plannedSavings = snapshot.buckets.holidayContribution + snapshot.buckets.bufferContribution;
 
@@ -58,7 +60,18 @@ export default function DashboardPage() {
           label="Cash available today"
           value={formatCurrency(snapshot.startingCash)}
           hint="Everyday accounts only"
-        />
+        >
+          {everydayAccounts.length > 1 && (
+            <div className="mt-2 pt-2 border-t border-border space-y-0.5">
+              {everydayAccounts.map((a) => (
+                <div key={a.id} className="flex items-center justify-between text-xs text-muted">
+                  <span>{a.name}</span>
+                  <span className="tabular-nums">{formatCurrency(a.currentBalance)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </StatCard>
         <StatCard
           label="Safe to spend, left this fortnight"
           value={formatCurrency(Math.max(0, snapshot.funMoneyPace.remaining))}

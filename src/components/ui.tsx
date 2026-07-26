@@ -78,11 +78,13 @@ export function StatCard({
   value,
   hint,
   tone = "default",
+  children,
 }: {
   label: string;
   value: ReactNode;
   hint?: string;
   tone?: "default" | "primary" | "muted";
+  children?: ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
@@ -95,6 +97,7 @@ export function StatCard({
         {value}
       </p>
       {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
+      {children}
     </div>
   );
 }
