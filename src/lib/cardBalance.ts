@@ -1,6 +1,6 @@
 import { Accounts, Debts } from "./db/repo";
 import { round2 } from "./calculations";
-import type { Transaction } from "./types";
+import type { Debt, Transaction } from "./types";
 
 const PURCHASE_RATE = 20.99;
 const DEBT_ACCOUNT_TYPES = new Set(["credit_card", "personal_loan", "mortgage"]);
@@ -81,4 +81,20 @@ export function applyDebtPaymentEffect(
   if (linkedDebt) {
     Debts.update(linkedDebt.id, { balance: Math.max(0, round2(linkedDebt.balance - payment)) });
   }
+}
+
+/**
+ * Keeps a debt-type account's currentBalance mirroring its linked Debt's balance — e.g. editing
+ * a debt's balance in Settings immediately updates the credit_card/personal_loan/mortgage account
+ * it's linked to, so the two never drift apart. No-ops if the debt has no account, or the account
+ * isn't a debt-type account.
+ */
+export function syncAccountBalanceFromDebt(debt: Pick<Debt, "accountId" | "balance">): void {
+  if (!debt.accountId) return;
+  const account = Accounts.get(debt.accountId);
+  if (!account || !DEBT_ACCOUNT_TYPES.has(account.type)) return;
+
+  const newBalance = round2(Math.max(0, debt.balance));
+  if (newBalance === account.currentBalance) return;
+  Accounts.update(account.id, { currentBalance: newBalance });
 }
