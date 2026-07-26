@@ -278,13 +278,17 @@ export function buildFortnightSnapshot(
   }
   const billsDue = round2(billItems.reduce((s, i) => s + i.amount, 0));
 
-  // Required debt minimum payments
+  // Required debt payments. Credit card purchase balances are planned to be paid off in full
+  // (whatever's currently charged to the card), not just the bank's minimum — that's what keeps
+  // them interest-free. Instalment plans, personal loans, and the mortgage stay on their actual
+  // minimum payment, since those are fixed contractual schedules, not "pay it off each cycle" debt.
   const debtItems: LineItem[] = [];
   for (const d of Debts.all() as Debt[]) {
     if (d.balance <= 0 || !d.nextPaymentDate) continue;
     const freq = d.paymentFrequency as Frequency;
+    const amount = d.debtType === "credit_card_purchase" ? d.balance : d.minimumPayment;
     for (const date of occurrencesInWindow(d.nextPaymentDate, freq, window)) {
-      debtItems.push({ name: d.name, amount: d.minimumPayment, date, category: "Credit card / debt management" });
+      debtItems.push({ name: d.name, amount, date, category: "Credit card / debt management" });
     }
   }
   const requiredDebtPayments = round2(debtItems.reduce((s, i) => s + i.amount, 0));
