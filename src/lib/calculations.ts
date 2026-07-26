@@ -67,11 +67,21 @@ export const DEFAULT_PLANNING_DEFAULTS: PlanningDefaults = {
 // Style multipliers applied to the gentle-plan defaults above.
 export const STYLE_MULTIPLIERS: Record<
   PlanningStyle,
-  { fun: number; hobby: number; holiday: number; debtFocus: number }
+  { fun: number; hobby: number; holiday: number; buffer: number; debtFocus: number }
 > = {
-  gentle: { fun: 1, hobby: 1, holiday: 1, debtFocus: 0.5 },
-  balanced: { fun: 0.75, hobby: 0.75, holiday: 0.6, debtFocus: 0.75 },
-  aggressive: { fun: 0.5, hobby: 0.5, holiday: 0, debtFocus: 1 },
+  gentle: { fun: 1, hobby: 1, holiday: 1, buffer: 1, debtFocus: 0.5 },
+  balanced: { fun: 0.75, hobby: 0.75, holiday: 0.6, buffer: 1, debtFocus: 0.75 },
+  aggressive: { fun: 0.5, hobby: 0.5, holiday: 0, buffer: 1, debtFocus: 1 },
+  // Nothing extra goes to the holiday fund, buffer, or debt cleanup this fortnight — whatever's
+  // left over after fun/hobby spending just stays as unallocated flexible cash.
+  no_extra_savings: { fun: 1, hobby: 1, holiday: 0, buffer: 0, debtFocus: 0 },
+};
+
+export const PLANNING_STYLE_LABELS: Record<PlanningStyle, { short: string; description: string }> = {
+  gentle: { short: "Gentle", description: "Preserve quality of life" },
+  balanced: { short: "Balanced", description: "Moderate debt payoff" },
+  aggressive: { short: "Aggressive", description: "Temporary austerity" },
+  no_extra_savings: { short: "No extra savings", description: "Keep leftover cash flexible, nothing extra to funds" },
 };
 
 /* ---------------------------------------------------------------------- */
@@ -213,7 +223,7 @@ export function splitFlexibleCash(params: {
   const holidayTarget = params.cardRiskControlled
     ? conversions.monthlyToFortnightly(defaults.holidayMonthly) * mult.holiday
     : 0;
-  const bufferTarget = params.bufferMet ? 0 : conversions.monthlyToFortnightly(200);
+  const bufferTarget = params.bufferMet ? 0 : conversions.monthlyToFortnightly(200) * mult.buffer;
 
   const funMoney = Math.min(funTarget, pool);
   pool -= funMoney;

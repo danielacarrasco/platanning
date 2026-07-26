@@ -56,6 +56,7 @@ export default function SettingsPage() {
               <option value="gentle">Gentle — preserve quality of life</option>
               <option value="balanced">Balanced — moderate debt payoff</option>
               <option value="aggressive">Aggressive — temporary austerity</option>
+              <option value="no_extra_savings">No extra savings — keep leftover cash flexible</option>
             </select>
           </div>
           <button className={btnCls} type="submit">Save</button>

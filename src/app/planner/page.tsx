@@ -7,12 +7,13 @@ import {
 } from "@/lib/planning";
 import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
 import { FortnightStatusBadge, Panel, EmptyState, SpendingPaceBar } from "@/components/ui";
+import { PLANNING_STYLE_LABELS } from "@/lib/calculations";
 import type { PlanningStyle } from "@/lib/types";
 import { updatePlanningStyle } from "../settings/actions";
 
 export const dynamic = "force-dynamic";
 
-const STYLES: PlanningStyle[] = ["gentle", "balanced", "aggressive"];
+const STYLES: PlanningStyle[] = ["gentle", "balanced", "aggressive", "no_extra_savings"];
 
 export default async function PlannerPage({
   searchParams,
@@ -65,12 +66,12 @@ export default async function PlannerPage({
           {STYLES.map((s) => (
             <label
               key={s}
-              className={`rounded-lg border px-3 py-2 text-sm cursor-pointer capitalize ${
+              className={`rounded-lg border px-3 py-2 text-sm cursor-pointer ${
                 s === style ? "border-primary bg-primary-soft font-medium" : "border-border"
               }`}
             >
               <input type="radio" name="planningStyle" value={s} defaultChecked={s === style} className="mr-2" />
-              {s}
+              {PLANNING_STYLE_LABELS[s].short}
             </label>
           ))}
           <button type="submit" className="rounded-lg bg-primary text-primary-foreground px-3 py-2 text-sm font-medium">
@@ -79,8 +80,10 @@ export default async function PlannerPage({
         </form>
         <p className="text-xs text-muted mt-2">
           Gentle preserves quality of life with slower debt payoff. Balanced trims discretionary
-          spending moderately. Aggressive is temporary austerity to maximise debt payoff — not the
-          default, and never required.
+          spending moderately. Aggressive is temporary austerity to maximise debt payoff. No extra
+          savings keeps fun money and hobbies at the normal target but sends nothing extra to the
+          holiday fund, buffer, or debt cleanup — whatever&apos;s left just stays as flexible cash.
+          None of these are the default, and none are ever required.
         </p>
       </Panel>
 
@@ -172,17 +175,19 @@ export default async function PlannerPage({
                 <th className="py-2 pr-4 font-normal">Holiday</th>
                 <th className="py-2 pr-4 font-normal">Buffer</th>
                 <th className="py-2 pr-4 font-normal">Card cleanup</th>
+                <th className="py-2 pr-4 font-normal">Unallocated</th>
               </tr>
             </thead>
             <tbody>
               {comparisons.map((c) => (
                 <tr key={c.style} className={`border-t border-border ${c.style === style ? "bg-primary-soft/40" : ""}`}>
-                  <td className="py-2 pr-4 capitalize font-medium">{c.style}</td>
+                  <td className="py-2 pr-4 font-medium">{PLANNING_STYLE_LABELS[c.style].short}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatCurrency(c.snapshot.buckets.funMoney)}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatCurrency(c.snapshot.buckets.hobbyMoney)}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatCurrency(c.snapshot.buckets.holidayContribution)}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatCurrency(c.snapshot.buckets.bufferContribution)}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatCurrency(c.snapshot.buckets.cardCleanup)}</td>
+                  <td className="py-2 pr-4 tabular-nums">{formatCurrency(c.snapshot.buckets.leftoverUnallocated)}</td>
                 </tr>
               ))}
             </tbody>
