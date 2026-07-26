@@ -62,6 +62,9 @@ export interface FortnightSnapshot {
   funMoneyPace: SpendingPace;
   hobbyMoneyPace: SpendingPace;
   actualCardSpending: number;
+  /** Actual card payments/debt payments/transfers logged so far in this window vs the planned
+   * required debt + card payments, paced the same way as funMoneyPace/hobbyMoneyPace. */
+  moneyMovementPace: SpendingPace;
 }
 
 /** Roll a date forward by one period of the given frequency (calendar-correct). */
@@ -244,10 +247,11 @@ export function assessCardRisk(): {
 export function buildFortnightSnapshot(
   window: FortnightWindow,
   planningStyle: PlanningStyle,
-  defaults: PlanningDefaults = DEFAULT_PLANNING_DEFAULTS
+  defaults: PlanningDefaults = DEFAULT_PLANNING_DEFAULTS,
+  startingCashOverride?: number
 ): FortnightSnapshot {
   const accounts = Accounts.all();
-  const startingCash = sumEverydayCash(accounts);
+  const startingCash = startingCashOverride ?? sumEverydayCash(accounts);
 
   // Income — the payday cadence is projected forward/back from the most recent recorded
   // payday rather than requiring a literal row for every fortnight (see projectedPaydayForWindow).
@@ -360,6 +364,18 @@ export function buildFortnightSnapshot(
   const funMoneyPace = calcSpendingPace({ planned: buckets.funMoney, actual: actualFunMoney, window, today });
   const hobbyMoneyPace = calcSpendingPace({ planned: buckets.hobbyMoney, actual: actualHobbyMoney, window, today });
 
+  const actualMoneyMovement = round2(
+    windowTxns
+      .filter((t) => (t.isTransfer || t.isCreditCardPayment || t.isDebtPayment) && t.amount < 0)
+      .reduce((s, t) => s + Math.abs(t.amount), 0)
+  );
+  const moneyMovementPace = calcSpendingPace({
+    planned: requiredDebtPayments + cardPayments,
+    actual: actualMoneyMovement,
+    window,
+    today,
+  });
+
   return {
     window,
     planningStyle,
@@ -383,7 +399,29 @@ export function buildFortnightSnapshot(
     funMoneyPace,
     hobbyMoneyPace,
     actualCardSpending,
+    moneyMovementPace,
   };
+}
+
+/**
+ * Builds snapshots for a sequence of fortnight windows under a single planning style, chaining
+ * each window's starting cash from the previous window's ending cash forecast — so a projection
+ * into future fortnights reflects what's actually expected to be left, not today's live balance
+ * repeated for every window. The first window always uses the real, live starting cash.
+ */
+export function buildChainedFortnightSnapshots(
+  windows: FortnightWindow[],
+  planningStyle: PlanningStyle,
+  defaults: PlanningDefaults = DEFAULT_PLANNING_DEFAULTS
+): FortnightSnapshot[] {
+  const snapshots: FortnightSnapshot[] = [];
+  let carryStartingCash: number | undefined;
+  for (const w of windows) {
+    const snapshot = buildFortnightSnapshot(w, planningStyle, defaults, carryStartingCash);
+    snapshots.push(snapshot);
+    carryStartingCash = snapshot.endingCashForecast;
+  }
+  return snapshots;
 }
 
 export function getPlanningStyle(): PlanningStyle {

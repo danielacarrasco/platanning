@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  buildFortnightSnapshot,
+  buildChainedFortnightSnapshots,
   getPlanningDefaults,
   getPlanningStyle,
   listWindows,
@@ -25,11 +25,14 @@ export default async function PlannerPage({
   const defaults = getPlanningDefaults();
   const windows = listWindows(6);
   const window = windows[offset];
-  const snapshot = buildFortnightSnapshot(window, style, defaults);
+  // Each window's starting cash chains from the previous window's ending forecast, rather than
+  // repeating today's live balance for every future fortnight — see buildChainedFortnightSnapshots.
+  const chainedSnapshots = buildChainedFortnightSnapshots(windows, style, defaults);
+  const snapshot = chainedSnapshots[offset];
 
   const comparisons = STYLES.map((s) => ({
     style: s,
-    snapshot: buildFortnightSnapshot(window, s, defaults),
+    snapshot: buildChainedFortnightSnapshots(windows, s, defaults)[offset],
   }));
 
   return (
@@ -43,21 +46,18 @@ export default async function PlannerPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {windows.map((w, i) => {
-          const s = buildFortnightSnapshot(w, style, defaults);
-          return (
-            <Link
-              key={w.startDate}
-              href={`/planner?offset=${i}`}
-              className={`rounded-xl border px-3 py-2 text-sm ${
-                i === offset ? "border-primary bg-primary-soft" : "border-border hover:bg-surface-muted"
-              }`}
-            >
-              <div className="font-medium">{formatDateShort(w.startDate)} – {formatDateShort(w.endDate)}</div>
-              <div className="mt-1"><FortnightStatusBadge status={s.status} compact /></div>
-            </Link>
-          );
-        })}
+        {chainedSnapshots.map((s, i) => (
+          <Link
+            key={s.window.startDate}
+            href={`/planner?offset=${i}`}
+            className={`rounded-xl border px-3 py-2 text-sm ${
+              i === offset ? "border-primary bg-primary-soft" : "border-border hover:bg-surface-muted"
+            }`}
+          >
+            <div className="font-medium">{formatDateShort(s.window.startDate)} – {formatDateShort(s.window.endDate)}</div>
+            <div className="mt-1"><FortnightStatusBadge status={s.status} compact /></div>
+          </Link>
+        ))}
       </div>
 
       <Panel title="Planning style for this plan">
@@ -99,6 +99,12 @@ export default async function PlannerPage({
             <div className="h-px bg-border my-2" />
             <Row label="= Remaining flexible cash" amount={snapshot.trueAvailable} bold />
           </div>
+
+          {offset === 0 && (
+            <div className="mt-4">
+              <SpendingPaceBar label="Money movement (card payments, debt, transfers)" pace={snapshot.moneyMovementPace} />
+            </div>
+          )}
 
           <div className="mt-5">
             <p className="text-sm font-medium mb-2">

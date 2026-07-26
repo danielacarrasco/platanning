@@ -151,6 +151,7 @@ export default function DashboardPage() {
         <div className="grid sm:grid-cols-2 gap-6">
           <SpendingPaceBar label="Fun money (coffees, eating out, treats)" pace={snapshot.funMoneyPace} />
           <SpendingPaceBar label="Sewing / hobbies" pace={snapshot.hobbyMoneyPace} />
+          <SpendingPaceBar label="Money movement (card payments, debt, transfers)" pace={snapshot.moneyMovementPace} />
         </div>
         {snapshot.actualCardSpending > 0 && (
           <p className="text-xs text-muted mt-4">
