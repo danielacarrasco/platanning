@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Accounts, Debts, SinkingFunds } from "@/lib/db/repo";
 import { buildFortnightSnapshot, getFortnightWindow, getPlanningStyle, getPlanningDefaults, assessCardRisk } from "@/lib/planning";
-import { computeDebtPriority } from "@/lib/calculations";
+import { computeDebtPriority, PLANNING_STYLE_LABELS } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
 import { FortnightStatusBadge, Panel, ProgressBar, StatCard, CardStatusBadge, EmptyState, SpendingPaceBar } from "@/components/ui";
 
@@ -34,7 +34,7 @@ export default function DashboardPage() {
           <h1 className="text-xl font-semibold">This fortnight</h1>
           <p className="text-sm text-muted">
             {formatDate(window.startDate)} – {formatDate(window.endDate)} · Planning style:{" "}
-            <span className="capitalize font-medium text-foreground">{style}</span>
+            <span className="font-medium text-foreground">{PLANNING_STYLE_LABELS[style].short}</span>
           </p>
         </div>
         <FortnightStatusBadge status={snapshot.status} />

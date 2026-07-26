@@ -8,7 +8,7 @@ export type AccountType =
   | "personal_loan";
 export type Importance = "essential" | "important" | "discretionary";
 export type AmountType = "fixed" | "variable" | "estimated";
-export type PlanningStyle = "gentle" | "balanced" | "aggressive";
+export type PlanningStyle = "gentle" | "balanced" | "aggressive" | "no_extra_savings";
 export type FortnightStatus = "green" | "yellow" | "red";
 export type CardStatus = "clean" | "watch" | "risk" | "problem";
 export type FundingSource =
