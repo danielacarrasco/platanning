@@ -1,4 +1,4 @@
-import { Accounts, Debts, IncomeSources, Paydays, RecurringExpenses, SinkingFunds, CardStatements, Settings } from "./db/repo";
+import { Accounts, Debts, FortnightOverrides, IncomeSources, Paydays, RecurringExpenses, SinkingFunds, CardStatements, Settings } from "./db/repo";
 import { Transactions } from "./db/transactions";
 import {
   DEFAULT_PLANNING_DEFAULTS,
@@ -17,6 +17,7 @@ import type {
   CardStatus,
   Debt,
   Frequency,
+  FortnightOverrideField,
   FortnightStatus,
   IncomeSource,
   Payday,
@@ -49,9 +50,14 @@ export interface FortnightSnapshot {
   debtItems: LineItem[];
   cardPayments: number;
   cardItems: LineItem[];
+  /** requiredDebtPayments + cardPayments, or the manually overridden total for this fortnight —
+   * this is what actually drives trueAvailable/status/endingCashForecast, not the raw sum. */
+  debtAndCardPayments: number;
   requiredSetAsides: number;
   setAsideItems: LineItem[];
   hardFloorBuffer: number;
+  /** Which of the "Starting cash" figures have a manual override for this fortnight. */
+  overriddenFields: FortnightOverrideField[];
   trueAvailable: number;
   buckets: BucketSplitResult;
   status: FortnightStatus;
@@ -248,10 +254,11 @@ export function buildFortnightSnapshot(
   window: FortnightWindow,
   planningStyle: PlanningStyle,
   defaults: PlanningDefaults = DEFAULT_PLANNING_DEFAULTS,
-  startingCashOverride?: number
+  startingCashOverride?: number,
+  userOverrides: Partial<Record<FortnightOverrideField, number>> = {}
 ): FortnightSnapshot {
   const accounts = Accounts.all();
-  const startingCash = startingCashOverride ?? sumEverydayCash(accounts);
+  const startingCash = userOverrides.startingCash ?? startingCashOverride ?? sumEverydayCash(accounts);
 
   // Income — the payday cadence is projected forward/back from the most recent recorded
   // payday rather than requiring a literal row for every fortnight (see projectedPaydayForWindow).
@@ -267,7 +274,7 @@ export function buildFortnightSnapshot(
       incomeItems.push({ name: src.name, amount: src.amount, date });
     }
   }
-  const income = round2(incomeItems.reduce((s, i) => s + i.amount, 0));
+  const income = userOverrides.income ?? round2(incomeItems.reduce((s, i) => s + i.amount, 0));
 
   // Bills (recurring expenses)
   const billItems: LineItem[] = [];
@@ -276,7 +283,7 @@ export function buildFortnightSnapshot(
       billItems.push({ name: r.name, amount: r.amount, date, category: r.category, importance: r.importance });
     }
   }
-  const billsDue = round2(billItems.reduce((s, i) => s + i.amount, 0));
+  const billsDue = userOverrides.billsDue ?? round2(billItems.reduce((s, i) => s + i.amount, 0));
 
   // Required debt payments. Credit card purchase balances are planned to be paid off in full
   // (whatever's currently charged to the card), not just the bank's minimum — that's what keeps
@@ -315,22 +322,27 @@ export function buildFortnightSnapshot(
     date: window.startDate,
     category: "Goals",
   }));
-  const requiredSetAsides = round2(setAsideItems.reduce((s, i) => s + i.amount, 0));
+  const requiredSetAsides = userOverrides.requiredSetAsides ?? round2(setAsideItems.reduce((s, i) => s + i.amount, 0));
+  const hardFloorBuffer = userOverrides.hardFloorBuffer ?? defaults.hardFloorBuffer;
+  // The combined "Required debt payments" figure shown/adjusted as one row in the planner — the
+  // itemized debtItems/cardItems lists above stay computed from real data either way, only this
+  // total (and everything derived from it) reflects a manual override.
+  const debtAndCardPayments = userOverrides.debtAndCardPayments ?? round2(requiredDebtPayments + cardPayments);
 
   const trueAvailable = calcTrueAvailable({
     startingCash,
     incomeDueThisFortnight: income,
     billsDueBeforeNextPayday: billsDue,
-    requiredDebtPayments: requiredDebtPayments + cardPayments,
+    requiredDebtPayments: debtAndCardPayments,
     requiredSinkingFundSetAsides: requiredSetAsides,
-    minimumCashBufferProtection: defaults.hardFloorBuffer,
+    minimumCashBufferProtection: hardFloorBuffer,
   });
 
   const cardRisk = assessCardRisk();
   const status = calcFortnightStatus({
     income,
     billsDue,
-    debtPayments: requiredDebtPayments + cardPayments,
+    debtPayments: debtAndCardPayments,
     cardRisk: cardRisk.worst,
   });
 
@@ -346,7 +358,7 @@ export function buildFortnightSnapshot(
   });
 
   const endingCashForecast = round2(
-    startingCash + income - billsDue - requiredDebtPayments - cardPayments - requiredSetAsides -
+    startingCash + income - billsDue - debtAndCardPayments - requiredSetAsides -
       buckets.funMoney - buckets.hobbyMoney - buckets.holidayContribution - buckets.bufferContribution - buckets.cardCleanup
   );
 
@@ -374,7 +386,7 @@ export function buildFortnightSnapshot(
       .reduce((s, t) => s + Math.abs(t.amount), 0)
   );
   const moneyMovementPace = calcSpendingPace({
-    planned: requiredDebtPayments + cardPayments,
+    planned: debtAndCardPayments,
     actual: actualMoneyMovement,
     window,
     today,
@@ -392,9 +404,11 @@ export function buildFortnightSnapshot(
     debtItems,
     cardPayments,
     cardItems,
+    debtAndCardPayments,
     requiredSetAsides,
     setAsideItems,
-    hardFloorBuffer: defaults.hardFloorBuffer,
+    hardFloorBuffer,
+    overriddenFields: Object.keys(userOverrides) as FortnightOverrideField[],
     trueAvailable,
     buckets,
     status,
@@ -412,6 +426,10 @@ export function buildFortnightSnapshot(
  * each window's starting cash from the previous window's ending cash forecast — so a projection
  * into future fortnights reflects what's actually expected to be left, not today's live balance
  * repeated for every window. The first window always uses the real, live starting cash.
+ *
+ * Also looks up any manual per-fortnight overrides stored for each window (see FortnightOverrides)
+ * and applies them — a stored override always wins over both the calculated default and the
+ * chained-forward value, since it's the user directly correcting that fortnight's numbers.
  */
 export function buildChainedFortnightSnapshots(
   windows: FortnightWindow[],
@@ -421,7 +439,8 @@ export function buildChainedFortnightSnapshots(
   const snapshots: FortnightSnapshot[] = [];
   let carryStartingCash: number | undefined;
   for (const w of windows) {
-    const snapshot = buildFortnightSnapshot(w, planningStyle, defaults, carryStartingCash);
+    const overrides = FortnightOverrides.get(w.startDate);
+    const snapshot = buildFortnightSnapshot(w, planningStyle, defaults, carryStartingCash, overrides);
     snapshots.push(snapshot);
     carryStartingCash = snapshot.endingCashForecast;
   }

@@ -5,6 +5,7 @@ import type {
   AiInsight,
   CreditCardStatement,
   Debt,
+  FortnightOverrideField,
   FortnightPlan,
   IncomeSource,
   MonthlyReview,
@@ -459,6 +460,30 @@ export const AiInsights = {
   },
   remove(id: number): void {
     getDb().prepare("UPDATE ai_insight SET status = 'deleted' WHERE id = ?").run(id);
+  },
+};
+
+/* Per-fortnight manual overrides ------------------------------------------*/
+export const FortnightOverrides = {
+  /** All overrides set for a given fortnight, keyed by field name. Empty object if none. */
+  get(windowStart: string): Partial<Record<FortnightOverrideField, number>> {
+    const rows = getDb()
+      .prepare("SELECT field, value FROM fortnight_override WHERE window_start = ?")
+      .all(windowStart) as { field: FortnightOverrideField; value: number }[];
+    const result: Partial<Record<FortnightOverrideField, number>> = {};
+    for (const r of rows) result[r.field] = r.value;
+    return result;
+  },
+  set(windowStart: string, field: FortnightOverrideField, value: number): void {
+    getDb()
+      .prepare(
+        `INSERT INTO fortnight_override (window_start, field, value) VALUES (@windowStart, @field, @value)
+         ON CONFLICT(window_start, field) DO UPDATE SET value = excluded.value`
+      )
+      .run({ windowStart, field, value });
+  },
+  clearAll(windowStart: string): void {
+    getDb().prepare("DELETE FROM fortnight_override WHERE window_start = ?").run(windowStart);
   },
 };
 

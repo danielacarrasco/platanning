@@ -172,6 +172,20 @@ CREATE TABLE IF NOT EXISTS app_setting (
   value TEXT
 );
 
+-- Per-fortnight manual overrides for the Fortnight Planner's "Starting cash" figures (starting
+-- cash, income, bills due, required debt payments, sinking fund set-asides, buffer protection).
+-- Sparse: only fields the user has actually adjusted for that fortnight get a row here — anything
+-- not present just uses the normal calculated value. Keyed by window_start, not a plan id, so it
+-- survives independently of any fortnight_plan snapshot.
+CREATE TABLE IF NOT EXISTS fortnight_override (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  window_start TEXT NOT NULL,
+  field TEXT NOT NULL,
+  value REAL NOT NULL,
+  UNIQUE(window_start, field)
+);
+
 CREATE INDEX IF NOT EXISTS idx_transaction_date ON "transaction"(date);
 CREATE INDEX IF NOT EXISTS idx_transaction_category ON "transaction"(category);
 CREATE INDEX IF NOT EXISTS idx_fortnight_plan_dates ON fortnight_plan(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_fortnight_override_window ON fortnight_override(window_start);
