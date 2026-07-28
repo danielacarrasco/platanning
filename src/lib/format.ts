@@ -16,6 +16,12 @@ export function formatDateShort(dateStr: string): string {
   return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short" }).format(d);
 }
 
+export function formatFrequency(frequency: string): string {
+  if (frequency === "one_off") return "One-off";
+  if (frequency === "biannual") return "Every 6 months";
+  return frequency.charAt(0).toUpperCase() + frequency.slice(1);
+}
+
 export function daysUntil(dateStr: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

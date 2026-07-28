@@ -1,6 +1,6 @@
 import { RecurringExpenses, Debts, Accounts } from "@/lib/db/repo";
 import { buildFortnightSnapshot, getPlanningDefaults, getPlanningStyle, listWindows } from "@/lib/planning";
-import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateShort, formatFrequency } from "@/lib/format";
 import { FortnightStatusBadge, Panel, Pill, EmptyState } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +81,7 @@ export default function BillsCalendarPage() {
                 <tr key={r.id} className="border-t border-border">
                   <td className="py-2 pr-4">{r.name}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatCurrency(r.amount)}</td>
-                  <td className="py-2 pr-4 capitalize">{r.frequency}</td>
+                  <td className="py-2 pr-4">{formatFrequency(r.frequency)}</td>
                   <td className="py-2 pr-4">{formatDateShort(r.nextDueDate)}</td>
                   <td className="py-2 pr-4">{r.category}</td>
                   <td className="py-2 pr-4">{r.paymentMethod ?? "—"}</td>
@@ -95,7 +95,7 @@ export default function BillsCalendarPage() {
                   <tr key={`debt-${d.id}`} className="border-t border-border">
                     <td className="py-2 pr-4">{d.name} (minimum)</td>
                     <td className="py-2 pr-4 tabular-nums">{formatCurrency(d.minimumPayment)}</td>
-                    <td className="py-2 pr-4 capitalize">{d.paymentFrequency}</td>
+                    <td className="py-2 pr-4">{formatFrequency(d.paymentFrequency)}</td>
                     <td className="py-2 pr-4">{d.nextPaymentDate ? formatDateShort(d.nextPaymentDate) : "—"}</td>
                     <td className="py-2 pr-4">Credit card / debt management</td>
                     <td className="py-2 pr-4">

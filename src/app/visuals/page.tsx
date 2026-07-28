@@ -6,7 +6,7 @@ import {
   getFixedCostPressure,
   getNetWorthAssumptions,
 } from "@/lib/longterm";
-import { computeDebtPriority, simulatePayoff, conversions, type PayoffSimDebt } from "@/lib/calculations";
+import { computeDebtPriority, simulatePayoff, conversions, toFortnightly, type PayoffSimDebt } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/format";
 import { Panel, ProgressBar } from "@/components/ui";
 import { CashFlowChart } from "@/components/charts/CashFlowChart";
@@ -36,12 +36,7 @@ export default function VisualsPage() {
     name: p.debt.name,
     balance: p.debt.balance,
     interestRatePct: p.debt.interestRate,
-    minimumPaymentFortnightly:
-      p.debt.paymentFrequency === "weekly"
-        ? conversions.weeklyToFortnightly(p.debt.minimumPayment)
-        : p.debt.paymentFrequency === "monthly"
-          ? conversions.monthlyToFortnightly(p.debt.minimumPayment)
-          : p.debt.minimumPayment,
+    minimumPaymentFortnightly: toFortnightly(p.debt.minimumPayment, p.debt.paymentFrequency),
   }));
   const payoffScenarios = [
     { label: "Minimum only", extra: 0 },

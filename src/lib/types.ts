@@ -1,4 +1,4 @@
-export type Frequency = "weekly" | "fortnightly" | "monthly" | "quarterly" | "annual";
+export type Frequency = "weekly" | "fortnightly" | "monthly" | "quarterly" | "annual" | "biannual" | "one_off";
 export type AccountType =
   | "everyday"
   | "savings"
@@ -95,7 +95,7 @@ export interface Debt {
   balance: number;
   interestRate: number;
   minimumPayment: number;
-  paymentFrequency: "weekly" | "fortnightly" | "monthly";
+  paymentFrequency: "weekly" | "fortnightly" | "monthly" | "biannual" | "one_off";
   debtType: DebtType;
   nextPaymentDate: string | null;
   priority: number | null;

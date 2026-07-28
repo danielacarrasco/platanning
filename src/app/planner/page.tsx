@@ -3,7 +3,7 @@ import {
   buildChainedFortnightSnapshots,
   getPlanningDefaults,
   getPlanningStyle,
-  listWindows,
+  listWindowsUntil,
 } from "@/lib/planning";
 import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
 import { FortnightStatusBadge, Panel, Pill, EmptyState, SpendingPaceBar } from "@/components/ui";
@@ -31,10 +31,13 @@ export default async function PlannerPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const offset = Math.max(0, Math.min(5, Number(params.offset ?? 0) || 0));
   const style = getPlanningStyle();
   const defaults = getPlanningDefaults();
-  const windows = listWindows(6);
+  // Covers every fortnight for a full year out from today.
+  const oneYearOut = new Date();
+  oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+  const windows = listWindowsUntil(oneYearOut.toISOString().slice(0, 10));
+  const offset = Math.max(0, Math.min(windows.length - 1, Number(params.offset ?? 0) || 0));
   const window = windows[offset];
   // Each window's starting cash chains from the previous window's ending forecast, rather than
   // repeating today's live balance for every future fortnight — see buildChainedFortnightSnapshots.
@@ -215,16 +218,26 @@ export default async function PlannerPage({
             {[...snapshot.billItems, ...snapshot.debtItems, ...snapshot.cardItems].length === 0 ? (
               <EmptyState>Nothing due in this window.</EmptyState>
             ) : (
-              <ul className="divide-y divide-border">
-                {[...snapshot.billItems, ...snapshot.debtItems, ...snapshot.cardItems]
-                  .sort((a, b) => (a.date < b.date ? -1 : 1))
-                  .map((item, i) => (
-                    <li key={i} className="flex items-center justify-between py-1.5 text-sm">
-                      <span>{item.name} <span className="text-muted">· {formatDateShort(item.date)}</span></span>
-                      <span className="tabular-nums font-medium">{formatCurrency(item.amount)}</span>
-                    </li>
-                  ))}
-              </ul>
+              <>
+                <ul className="divide-y divide-border">
+                  {[...snapshot.billItems, ...snapshot.debtItems, ...snapshot.cardItems]
+                    .sort((a, b) => (a.date < b.date ? -1 : 1))
+                    .map((item, i) => (
+                      <li key={i} className="flex items-center justify-between py-1.5 text-sm">
+                        <span>{item.name} <span className="text-muted">· {formatDateShort(item.date)}</span></span>
+                        <span className="tabular-nums font-medium">{formatCurrency(item.amount)}</span>
+                      </li>
+                    ))}
+                </ul>
+                <div className="flex items-center justify-between pt-2 mt-1 border-t border-border text-sm font-semibold">
+                  <span>Total</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(
+                      [...snapshot.billItems, ...snapshot.debtItems, ...snapshot.cardItems].reduce((s, i) => s + i.amount, 0)
+                    )}
+                  </span>
+                </div>
+              </>
             )}
           </Panel>
           <Panel title="Set-asides this fortnight">
@@ -236,6 +249,12 @@ export default async function PlannerPage({
                 </li>
               ))}
             </ul>
+            <div className="flex items-center justify-between pt-2 mt-1 border-t border-border text-sm font-semibold">
+              <span>Total</span>
+              <span className="tabular-nums">
+                {formatCurrency(snapshot.setAsideItems.filter((i) => i.amount > 0).reduce((s, i) => s + i.amount, 0))}
+              </span>
+            </div>
           </Panel>
         </div>
       </div>

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Debts } from "@/lib/db/repo";
-import { computeDebtPriority, simulatePayoff, conversions, type PayoffSimDebt, type PayoffMethod } from "@/lib/calculations";
+import { computeDebtPriority, simulatePayoff, conversions, toFortnightly, type PayoffSimDebt, type PayoffMethod } from "@/lib/calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Panel, Pill, EmptyState } from "@/components/ui";
 import { ExportLinks } from "@/components/ExportLinks";
 import { DebtPayoffChart } from "@/components/charts/DebtPayoffChart";
+import type { Debt } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -141,10 +142,8 @@ export default async function DebtStrategyPage({
   );
 }
 
-function toFortnightlyPayment(amount: number, frequency: "weekly" | "fortnightly" | "monthly"): number {
-  if (frequency === "weekly") return conversions.weeklyToFortnightly(amount);
-  if (frequency === "monthly") return conversions.monthlyToFortnightly(amount);
-  return amount;
+function toFortnightlyPayment(amount: number, frequency: Debt["paymentFrequency"]): number {
+  return toFortnightly(amount, frequency);
 }
 
 function allCleared(payoffDates: Record<number, string | null>): boolean {
