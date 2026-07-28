@@ -142,6 +142,16 @@ export interface Payday {
   source: string;
 }
 
+/** The 6 figures in the Fortnight Planner's "Starting cash" breakdown that can be manually
+ * overridden for a single fortnight (see FortnightOverrides in db/repo.ts). */
+export type FortnightOverrideField =
+  | "startingCash"
+  | "income"
+  | "billsDue"
+  | "debtAndCardPayments"
+  | "requiredSetAsides"
+  | "hardFloorBuffer";
+
 export interface FortnightPlan {
   id: number;
   startDate: string;

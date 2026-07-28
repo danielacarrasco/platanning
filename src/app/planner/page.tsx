@@ -6,14 +6,24 @@ import {
   listWindows,
 } from "@/lib/planning";
 import { formatCurrency, formatDate, formatDateShort } from "@/lib/format";
-import { FortnightStatusBadge, Panel, EmptyState, SpendingPaceBar } from "@/components/ui";
+import { FortnightStatusBadge, Panel, Pill, EmptyState, SpendingPaceBar } from "@/components/ui";
 import { PLANNING_STYLE_LABELS } from "@/lib/calculations";
+import { AdjustableAmount } from "@/components/AdjustableAmount";
 import type { PlanningStyle } from "@/lib/types";
 import { updatePlanningStyle } from "../settings/actions";
+import { setFortnightOverrides, clearFortnightOverrides } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const STYLES: PlanningStyle[] = ["gentle", "balanced", "aggressive", "no_extra_savings"];
+
+/** Generous slider range around a current value — 0 to roughly 3x (or +$1000, whichever is more
+ * headroom), rounded to a friendly step. The number input isn't hard-capped to this range. */
+function sliderBounds(value: number): { min: number; max: number; step: number } {
+  const base = Math.max(Math.abs(value), 50);
+  const max = Math.ceil(Math.max(base * 3, base + 1000) / 50) * 50;
+  return { min: 0, max, step: max > 5000 ? 50 : 10 };
+}
 
 export default async function PlannerPage({
   searchParams,
@@ -93,15 +103,81 @@ export default async function PlannerPage({
           action={<FortnightStatusBadge status={snapshot.status} />}
         >
           <div className="space-y-1 text-sm">
-            <Row label="Starting cash" amount={snapshot.startingCash} />
-            <Row label="+ Income due this fortnight" amount={snapshot.income} />
-            <Row label="− Bills due before next payday" amount={-snapshot.billsDue} />
-            <Row label="− Required debt payments" amount={-(snapshot.requiredDebtPayments + snapshot.cardPayments)} />
-            <Row label="− Sinking fund set-asides" amount={-snapshot.requiredSetAsides} />
-            <Row label="− Minimum buffer protection" amount={-snapshot.hardFloorBuffer} />
+            <Row label="Starting cash" amount={snapshot.startingCash} adjusted={snapshot.overriddenFields.includes("startingCash")} />
+            <Row label="+ Income due this fortnight" amount={snapshot.income} adjusted={snapshot.overriddenFields.includes("income")} />
+            <Row label="− Bills due before next payday" amount={-snapshot.billsDue} adjusted={snapshot.overriddenFields.includes("billsDue")} />
+            <Row label="− Required debt payments" amount={-snapshot.debtAndCardPayments} adjusted={snapshot.overriddenFields.includes("debtAndCardPayments")} />
+            <Row label="− Sinking fund set-asides" amount={-snapshot.requiredSetAsides} adjusted={snapshot.overriddenFields.includes("requiredSetAsides")} />
+            <Row label="− Minimum buffer protection" amount={-snapshot.hardFloorBuffer} adjusted={snapshot.overriddenFields.includes("hardFloorBuffer")} />
             <div className="h-px bg-border my-2" />
             <Row label="= Remaining flexible cash" amount={snapshot.trueAvailable} bold />
           </div>
+
+          <details className="mt-4" open={snapshot.overriddenFields.length > 0}>
+            <summary className="cursor-pointer text-sm font-medium text-primary">
+              Adjust this fortnight&apos;s numbers
+            </summary>
+            <p className="text-xs text-muted mt-2 mb-3">
+              Override any of these just for {formatDateShort(window.startDate)} – {formatDateShort(window.endDate)}{" "}
+              — doesn&apos;t touch your underlying accounts, income, or bills, and every other
+              fortnight is unaffected.
+            </p>
+            <form key={window.startDate} action={setFortnightOverrides} className="space-y-4">
+              <input type="hidden" name="windowStart" value={window.startDate} />
+              <AdjustableAmount
+                key={`startingCash-${window.startDate}-${snapshot.startingCash}`}
+                name="startingCash"
+                label="Starting cash"
+                defaultValue={snapshot.startingCash}
+                {...sliderBounds(snapshot.startingCash)}
+              />
+              <AdjustableAmount
+                key={`income-${window.startDate}-${snapshot.income}`}
+                name="income"
+                label="Income due this fortnight"
+                defaultValue={snapshot.income}
+                {...sliderBounds(snapshot.income)}
+              />
+              <AdjustableAmount
+                key={`billsDue-${window.startDate}-${snapshot.billsDue}`}
+                name="billsDue"
+                label="Bills due before next payday"
+                defaultValue={snapshot.billsDue}
+                {...sliderBounds(snapshot.billsDue)}
+              />
+              <AdjustableAmount
+                key={`debtAndCardPayments-${window.startDate}-${snapshot.debtAndCardPayments}`}
+                name="debtAndCardPayments"
+                label="Required debt payments"
+                defaultValue={snapshot.debtAndCardPayments}
+                {...sliderBounds(snapshot.debtAndCardPayments)}
+              />
+              <AdjustableAmount
+                key={`requiredSetAsides-${window.startDate}-${snapshot.requiredSetAsides}`}
+                name="requiredSetAsides"
+                label="Sinking fund set-asides"
+                defaultValue={snapshot.requiredSetAsides}
+                {...sliderBounds(snapshot.requiredSetAsides)}
+              />
+              <AdjustableAmount
+                key={`hardFloorBuffer-${window.startDate}-${snapshot.hardFloorBuffer}`}
+                name="hardFloorBuffer"
+                label="Minimum buffer protection"
+                defaultValue={snapshot.hardFloorBuffer}
+                {...sliderBounds(snapshot.hardFloorBuffer)}
+              />
+              <div className="flex items-center gap-3">
+                <button className="rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:opacity-90" type="submit">
+                  Apply for this fortnight
+                </button>
+                {snapshot.overriddenFields.length > 0 && (
+                  <button formAction={clearFortnightOverrides} className="text-xs text-muted underline">
+                    Reset all to calculated values
+                  </button>
+                )}
+              </div>
+            </form>
+          </details>
 
           {offset === 0 && (
             <div className="mt-4">
@@ -203,16 +279,20 @@ function Row({
   amount,
   bold = false,
   indent = false,
+  adjusted = false,
 }: {
   label: string;
   amount: number;
   bold?: boolean;
   indent?: boolean;
+  adjusted?: boolean;
 }) {
   const negative = amount < 0;
   return (
     <div className={`flex items-center justify-between ${indent ? "pl-3 text-muted" : ""}`}>
-      <span className={bold ? "font-semibold text-foreground" : ""}>{label}</span>
+      <span className={bold ? "font-semibold text-foreground" : ""}>
+        {label} {adjusted && <Pill tone="primary">adjusted</Pill>}
+      </span>
       <span className={`tabular-nums ${bold ? "font-semibold text-foreground" : ""} ${negative ? "text-status-red-fg" : ""}`}>
         {negative ? "−" : ""}
         {formatCurrency(Math.abs(amount))}
