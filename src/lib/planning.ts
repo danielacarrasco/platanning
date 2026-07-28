@@ -73,7 +73,8 @@ export interface FortnightSnapshot {
   moneyMovementPace: SpendingPace;
 }
 
-/** Roll a date forward by one period of the given frequency (calendar-correct). */
+/** Roll a date forward by one period of the given frequency (calendar-correct). No-ops for
+ * "one_off" — it never recurs, so callers should special-case it rather than rely on this. */
 export function rollForward(date: Date, frequency: Frequency): Date {
   const d = new Date(date);
   switch (frequency) {
@@ -92,16 +93,27 @@ export function rollForward(date: Date, frequency: Frequency): Date {
     case "annual":
       d.setFullYear(d.getFullYear() + 1);
       break;
+    case "biannual":
+      d.setMonth(d.getMonth() + 6);
+      break;
+    case "one_off":
+      break;
   }
   return d;
 }
 
-/** All occurrences of a recurring date/frequency that fall within [start, end]. */
+/** All occurrences of a recurring date/frequency that fall within [start, end]. A "one_off" item
+ * appears exactly once, on its own date, and never rolls forward into a later window once it's
+ * passed — it isn't recurring, so there's no "next" occurrence to roll toward. */
 export function occurrencesInWindow(
   nextDate: string,
   frequency: Frequency,
   window: FortnightWindow
 ): string[] {
+  if (frequency === "one_off") {
+    return nextDate >= window.startDate && nextDate <= window.endDate ? [nextDate] : [];
+  }
+
   const windowStart = new Date(window.startDate);
   const windowEnd = new Date(window.endDate);
   let cursor = new Date(nextDate);
@@ -213,6 +225,20 @@ export function listWindows(count: number, referenceDate: string = isoToday()): 
   for (let i = 0; i < count; i++) {
     windows.push(w);
     w = nextWindow(w);
+  }
+  return windows;
+}
+
+/** Every fortnight window from referenceDate up to (and including) whichever one contains
+ * endDate — e.g. a year out. Capped at 60 fortnights (~2.3 years) as a sanity limit. */
+export function listWindowsUntil(endDate: string, referenceDate: string = isoToday()): FortnightWindow[] {
+  const windows: FortnightWindow[] = [];
+  let w = getFortnightWindow(referenceDate);
+  let guard = 0;
+  while (w.startDate <= endDate && guard < 60) {
+    windows.push(w);
+    w = nextWindow(w);
+    guard++;
   }
   return windows;
 }

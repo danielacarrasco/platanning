@@ -1,6 +1,6 @@
 import { Accounts, IncomeSources, Paydays, RecurringExpenses, Debts } from "@/lib/db/repo";
 import { getPlanningDefaults, getPlanningStyle } from "@/lib/planning";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatFrequency } from "@/lib/format";
 import { Panel, Pill } from "@/components/ui";
 import { CATEGORIES } from "@/lib/types";
 import {
@@ -231,7 +231,7 @@ export default function SettingsPage() {
                   {r.name} <Pill>{r.category}</Pill>
                 </span>
                 <span className="font-medium tabular-nums">
-                  {formatCurrency(r.amount)} / {r.frequency}
+                  {formatCurrency(r.amount)} / {formatFrequency(r.frequency)}
                 </span>
               </summary>
               <div className="mt-3 space-y-3">
@@ -246,7 +246,9 @@ export default function SettingsPage() {
                       <option value="fortnightly">Fortnightly</option>
                       <option value="monthly">Monthly</option>
                       <option value="quarterly">Quarterly</option>
+                      <option value="biannual">Every 6 months</option>
                       <option value="annual">Annual</option>
+                      <option value="one_off">One-off</option>
                     </select>
                   </div>
                   <Field label="Next due date" name="nextDueDate" defaultValue={r.nextDueDate} type="date" />
@@ -305,7 +307,9 @@ export default function SettingsPage() {
                 <option value="fortnightly">Fortnightly</option>
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
+                <option value="biannual">Every 6 months</option>
                 <option value="annual">Annual</option>
+                <option value="one_off">One-off</option>
               </select>
             </div>
             <Field label="Next due date" name="nextDueDate" type="date" required />
@@ -376,6 +380,8 @@ export default function SettingsPage() {
                       <option value="weekly">Weekly</option>
                       <option value="fortnightly">Fortnightly</option>
                       <option value="monthly">Monthly</option>
+                      <option value="biannual">Every 6 months</option>
+                      <option value="one_off">One-off</option>
                     </select>
                   </div>
                   <Field label="Next payment date" name="nextPaymentDate" defaultValue={d.nextPaymentDate ?? ""} type="date" />
@@ -416,6 +422,8 @@ export default function SettingsPage() {
                 <option value="weekly">Weekly</option>
                 <option value="fortnightly">Fortnightly</option>
                 <option value="monthly">Monthly</option>
+                <option value="biannual">Every 6 months</option>
+                <option value="one_off">One-off</option>
               </select>
             </div>
             <div>

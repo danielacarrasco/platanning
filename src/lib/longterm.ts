@@ -1,6 +1,6 @@
 import { Accounts, Debts, IncomeSources, Paydays, RecurringExpenses, SinkingFunds, Settings } from "./db/repo";
 import { listWindows, buildFortnightSnapshot, getPlanningStyle, getPlanningDefaults } from "./planning";
-import { toMonthly, calcFixedCostPressure, calcNetWorth, round2, conversions } from "./calculations";
+import { toMonthly, toFortnightly, calcFixedCostPressure, calcNetWorth, round2, conversions } from "./calculations";
 import { mapToValueGroup } from "./valueGroups";
 import type { ValueGroup } from "./types";
 
@@ -83,12 +83,7 @@ export function buildNetWorthProjection(months = 12): NetWorthPoint[] {
     for (const d of debts) {
       let bal = d.balance;
       const periodicRate = d.interestRate / 100 / 26;
-      const fortnightlyPayment =
-        d.paymentFrequency === "weekly"
-          ? conversions.weeklyToFortnightly(d.minimumPayment)
-          : d.paymentFrequency === "monthly"
-            ? conversions.monthlyToFortnightly(d.minimumPayment)
-            : d.minimumPayment;
+      const fortnightlyPayment = toFortnightly(d.minimumPayment, d.paymentFrequency);
       for (let f = 0; f < fortnightsElapsed; f++) {
         bal += bal * periodicRate;
         bal = Math.max(0, bal - fortnightlyPayment);
@@ -131,7 +126,7 @@ export function getFixedCostPressure(): { pct: number; monthlyIncome: number; mo
     .reduce((s, r) => s + toMonthly(r.amount, r.frequency), 0);
   const debtMonthly = Debts.all()
     .filter((d) => d.balance > 0)
-    .reduce((s, d) => s + toMonthly(d.minimumPayment, d.paymentFrequency === "monthly" ? "monthly" : d.paymentFrequency === "weekly" ? "weekly" : "fortnightly"), 0);
+    .reduce((s, d) => s + toMonthly(d.minimumPayment, d.paymentFrequency), 0);
   const monthlyFixed = round2(essentialMonthly + debtMonthly);
   return { pct: calcFixedCostPressure(monthlyIncome, monthlyFixed), monthlyIncome, monthlyFixed };
 }
@@ -150,8 +145,7 @@ export function buildSpendingByValues(): ValueGroupTotal[] {
   }
   for (const d of Debts.all().filter((x) => x.balance > 0)) {
     const group = d.debtType === "mortgage" ? "home/security" : "debt cleanup";
-    const freq = d.paymentFrequency === "monthly" ? "monthly" : d.paymentFrequency === "weekly" ? "weekly" : "fortnightly";
-    totals.set(group, (totals.get(group) ?? 0) + toMonthly(d.minimumPayment, freq));
+    totals.set(group, (totals.get(group) ?? 0) + toMonthly(d.minimumPayment, d.paymentFrequency));
   }
   return [...totals.entries()]
     .map(([group, monthlyAmount]) => ({ group, monthlyAmount: round2(monthlyAmount) }))

@@ -15,6 +15,7 @@ export const conversions = {
   weeklyToFortnightly: (weeklyAmount: number) => weeklyAmount * 2,
   quarterlyToFortnightly: (quarterlyAmount: number) => (quarterlyAmount * 4) / 26,
   annualToFortnightly: (annualAmount: number) => annualAmount / 26,
+  biannualToFortnightly: (biannualAmount: number) => (biannualAmount * 2) / 26,
   fortnightlyToMonthly: (fortnightlyAmount: number) => (fortnightlyAmount * 26) / 12,
 };
 
@@ -30,6 +31,12 @@ export function toFortnightly(amount: number, frequency: Frequency): number {
       return conversions.quarterlyToFortnightly(amount);
     case "annual":
       return conversions.annualToFortnightly(amount);
+    case "biannual":
+      return conversions.biannualToFortnightly(amount);
+    case "one_off":
+      // A single event, not an ongoing recurring cost — it shows up as a line item on its own
+      // date (see occurrencesInWindow in lib/planning.ts) rather than an amortised fortnightly rate.
+      return 0;
   }
 }
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Accounts, IncomeSources, RecurringExpenses, Debts, Paydays, Settings } from "@/lib/db/repo";
 import { DEFAULT_PLANNING_DEFAULTS, type PlanningDefaults } from "@/lib/calculations";
 import { syncAccountBalanceFromDebts } from "@/lib/cardBalance";
-import type { AccountType, DebtType, Frequency, Importance, AmountType, PlanningStyle } from "@/lib/types";
+import type { AccountType, Debt, DebtType, Frequency, Importance, AmountType, PlanningStyle } from "@/lib/types";
 
 function str(fd: FormData, key: string): string {
   return String(fd.get(key) ?? "").trim();
@@ -144,7 +144,7 @@ export async function createDebt(fd: FormData) {
     balance: num(fd, "balance"),
     interestRate: num(fd, "interestRate"),
     minimumPayment: num(fd, "minimumPayment"),
-    paymentFrequency: str(fd, "paymentFrequency") as "weekly" | "fortnightly" | "monthly",
+    paymentFrequency: str(fd, "paymentFrequency") as Debt["paymentFrequency"],
     debtType: str(fd, "debtType") as DebtType,
     nextPaymentDate: strOrNull(fd, "nextPaymentDate"),
     priority: null,
@@ -168,7 +168,7 @@ export async function updateDebt(fd: FormData) {
     balance: num(fd, "balance"),
     interestRate: num(fd, "interestRate"),
     minimumPayment: num(fd, "minimumPayment"),
-    paymentFrequency: str(fd, "paymentFrequency") as "weekly" | "fortnightly" | "monthly",
+    paymentFrequency: str(fd, "paymentFrequency") as Debt["paymentFrequency"],
     nextPaymentDate: strOrNull(fd, "nextPaymentDate"),
     isPromotional: fd.get("isPromotional") === "on",
     promotionalEndDate: strOrNull(fd, "promotionalEndDate"),
