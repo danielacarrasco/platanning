@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { previewDataPacket } from "@/app/coach/actions";
 import type { CoachDataPacket, CoachAdvice } from "@/lib/aiCoach";
 import { formatCurrency } from "@/lib/format";
@@ -20,6 +20,7 @@ const btnCls = "rounded-full border border-border px-3 py-1.5 text-sm hover:bg-s
 
 export function CoachClient() {
   const [question, setQuestion] = useState(QUICK_ACTIONS[0]);
+  const [customQuestion, setCustomQuestion] = useState("");
   const [packet, setPacket] = useState<CoachDataPacket | null>(null);
   const [advice, setAdvice] = useState<CoachAdvice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,13 @@ export function CoachClient() {
       const p = await previewDataPacket(q);
       setPacket(p);
     });
+  }
+
+  function handleCustomSubmit(e: FormEvent) {
+    e.preventDefault();
+    const q = customQuestion.trim();
+    if (!q) return;
+    handlePreview(q);
   }
 
   async function handleSend() {
@@ -72,6 +80,23 @@ export function CoachClient() {
           </button>
         ))}
       </div>
+
+      <form onSubmit={handleCustomSubmit} className="flex flex-wrap gap-2">
+        <input
+          type="text"
+          value={customQuestion}
+          onChange={(e) => setCustomQuestion(e.target.value)}
+          placeholder="Or ask anything in your own words…"
+          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <button
+          type="submit"
+          disabled={!customQuestion.trim()}
+          className="rounded-lg border border-primary text-primary px-3 py-1.5 text-sm font-medium hover:bg-primary-soft disabled:opacity-50 disabled:hover:bg-transparent"
+        >
+          Ask
+        </button>
+      </form>
 
       {packet && (
         <div className="space-y-3">
